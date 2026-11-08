@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "packageRules": [
+    {
+      "groupName": "Kotlin",
+      "matchPackageNames": ["org.jetbrains.kotlin:**", "org.jetbrains.kotlin.jvm"]
+    },
+    {
+      "groupName": "Ktor",
+      "matchPackageNames": ["io.ktor:**"]
+    }
+  ]
+}

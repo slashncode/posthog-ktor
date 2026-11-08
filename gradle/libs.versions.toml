@@ -1,0 +1,41 @@
+# Every version in one place; Renovate keeps them at the newest stable release.
+
+[versions]
+# The JDK the build runs on; the bytecode stays at `jvm-target` so apps on older JVMs can use the library.
+java = "25"
+jvm-target = "17"
+kotlin = "2.4.21"
+ktor = "3.6.1"
+posthog-server = "2.24.0"
+coroutines = "1.11.0"
+serialization = "1.12.0"
+slf4j = "2.0.17"
+logback = "1.6.6"
+kotest = "6.2.6"
+dokka = "2.3.0"
+maven-publish = "0.37.0"
+binary-compatibility-validator = "0.18.2"
+ktlint-gradle = "14.2.0"
+foojay = "1.0.0"
+
+[libraries]
+posthog-server = { module = "com.posthog:posthog-server", version.ref = "posthog-server" }
+ktor-bom = { module = "io.ktor:ktor-bom", version.ref = "ktor" }
+ktor-server-core = { module = "io.ktor:ktor-server-core" }
+ktor-server-test-host = { module = "io.ktor:ktor-server-test-host" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+kotest-runner-junit5 = { module = "io.kotest:kotest-runner-junit5", version.ref = "kotest" }
+kotest-assertions-core = { module = "io.kotest:kotest-assertions-core", version.ref = "kotest" }
+
+# Gradle plugins, for build-logic
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+dokka-gradle-plugin = { module = "org.jetbrains.dokka:dokka-gradle-plugin", version.ref = "dokka" }
+maven-publish-gradle-plugin = { module = "com.vanniktech:gradle-maven-publish-plugin", version.ref = "maven-publish" }
+ktlint-gradle-plugin = { module = "org.jlleitschuh.gradle:ktlint-gradle", version.ref = "ktlint-gradle" }
+
+[plugins]
+binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "binary-compatibility-validator" }

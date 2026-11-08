@@ -1,0 +1,50 @@
+name: release
+
+# A tag `v1.2.3` publishes 1.2.3 to Maven Central and releases it. A manual run uploads the given
+# version and lets the Central Portal validate it (signature, POM, sources, javadoc) without
+# releasing: the deployment waits on central.sonatype.com to be published or dropped by hand.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to upload for validation, not released (e.g. 0.1.0-alpha01)
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 25
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Publish
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          EVENT: ${{ github.event_name }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          if [ "$EVENT" = "push" ]; then
+            version="${REF_NAME#v}"
+            task=publishAndReleaseToMavenCentral
+          else
+            version="$INPUT_VERSION"
+            task=publishToMavenCentral
+          fi
+          echo "Publishing $version with $task"
+          ./gradlew build "$task" -Pversion="$version" --no-configuration-cache
