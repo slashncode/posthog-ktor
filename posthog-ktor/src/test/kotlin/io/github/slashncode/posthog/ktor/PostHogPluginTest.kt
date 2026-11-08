@@ -33,7 +33,7 @@ class PostHogPluginTest :
                         install(PostHog)
 
                         posthog.isEnabled shouldBe true
-                        posthog.capture("order_placed", distinctId = "user-7", mapOf("items" to 2, "coupon" to null))
+                        posthog.capture("order_placed", mapOf("items" to 2, "coupon" to null), distinctId = "user-7")
                     }
                     startApplication()
                 }
