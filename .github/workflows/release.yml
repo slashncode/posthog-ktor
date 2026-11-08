@@ -47,4 +47,5 @@ jobs:
             task=publishToMavenCentral
           fi
           echo "Publishing $version with $task"
-          ./gradlew build "$task" -Pversion="$version" --no-configuration-cache
+          # Wait for Central's verdict (signature, POM, sources, javadoc), also for a dry run.
+          ./gradlew build "$task" -Pversion="$version" -PmavenCentralDeploymentValidation=VALIDATED --no-configuration-cache
