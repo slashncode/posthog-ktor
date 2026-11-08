@@ -2,6 +2,7 @@ import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinJvm
 import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 // Conventions for every published module: Kotlin with explicit API, built on the newest JDK but
 // compiled for the oldest one users may run, ktlint, Dokka, and publishing to Maven Central.
@@ -20,6 +21,9 @@ val targetJvm = versions.findVersion("jvm-target").get().requiredVersion
 kotlin {
     explicitApi()
     jvmToolchain(buildJdk)
+    // The public API is recorded in `api/<module>.api`; `check` fails on an unintended change.
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation()
     compilerOptions {
         jvmTarget.set(JvmTarget.fromTarget(targetJvm))
         // Compile against the target's JDK API, not the build JDK's, so nothing newer slips in.

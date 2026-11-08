@@ -8,7 +8,7 @@ Toolchain from the workspace `mise.toml` (`mise exec -- …`).
 
 - `./gradlew build` — compile, ktlint, API check, tests (JDK 25 toolchain; `-PtestJdk=17|21|25` tests on another JVM)
 - `./gradlew ktlintFormat` — format
-- `./gradlew apiDump` — record an intended public API change in `*/api/*.api`
+- `./gradlew updateKotlinAbi` — record an intended public API change in `*/api/*.api`
 - `./gradlew publishToMavenLocal` — local publication (unsigned)
 
 ## Rules

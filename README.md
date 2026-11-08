@@ -47,7 +47,7 @@ fun Application.module() {
 ## Development
 
 - `./gradlew build` builds and tests everything (JDK 25 from the Gradle toolchain); `-PtestJdk=17` runs the tests on another JVM.
-- The public API is recorded in `*/api/*.api`; after an intended change, `./gradlew apiDump`.
+- The public API is recorded in `*/api/*.api`; after an intended change, `./gradlew updateKotlinAbi`.
 - `./gradlew ktlintFormat` formats.
 - Releases: a tag `vX.Y.Z` publishes to Maven Central; a manual run of the `release` workflow uploads a version for validation only.
 
