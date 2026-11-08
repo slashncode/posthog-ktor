@@ -30,6 +30,7 @@ jobs:
           java-version: 25
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       - name: Publish
+        id: publish
         env:
           REF_NAME: ${{ github.ref_name }}
           INPUT_VERSION: ${{ inputs.version }}
@@ -39,6 +40,7 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
+          set -o pipefail
           if [ "$EVENT" = "push" ]; then
             version="${REF_NAME#v}"
             task=publishAndReleaseToMavenCentral
@@ -47,5 +49,29 @@ jobs:
             task=publishToMavenCentral
           fi
           echo "Publishing $version with $task"
-          # Wait for Central's verdict (signature, POM, sources, javadoc), also for a dry run.
-          ./gradlew build "$task" -Pversion="$version" -PmavenCentralDeploymentValidation=VALIDATED --no-configuration-cache
+          ./gradlew build "$task" -Pversion="$version" --no-configuration-cache | tee publish.log
+          echo "deployment=$(sed -n 's/.*deployment id: \([0-9a-f-]*\).*/\1/p' publish.log | tail -1)" >> "$GITHUB_OUTPUT"
+      # The plugin does not wait for Central's verdict on an upload it does not release: ask the
+      # Publisher API until the deployment is VALIDATED or FAILED, then drop it either way.
+      - name: Validate and drop (dry run)
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          DEPLOYMENT: ${{ steps.publish.outputs.deployment }}
+          USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          PASSWORD: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+        run: |
+          set -o pipefail
+          api=https://central.sonatype.com/api/v1/publisher
+          token=$(printf '%s:%s' "$USERNAME" "$PASSWORD" | base64 -w0)
+          state=UNKNOWN
+          for _ in $(seq 1 60); do
+            status=$(curl -fsS -X POST -H "Authorization: Bearer $token" "$api/status?id=$DEPLOYMENT")
+            state=$(jq -r .deploymentState <<< "$status")
+            echo "Deployment $DEPLOYMENT: $state"
+            if [ "$state" = VALIDATED ] || [ "$state" = FAILED ]; then break; fi
+            sleep 10
+          done
+          jq '.errors // {}' <<< "$status"
+          curl -fsS -X DELETE -H "Authorization: Bearer $token" "$api/deployment/$DEPLOYMENT"
+          echo "Dropped $DEPLOYMENT"
+          [ "$state" = VALIDATED ]
