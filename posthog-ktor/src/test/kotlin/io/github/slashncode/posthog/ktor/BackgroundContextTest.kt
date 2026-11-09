@@ -27,7 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import kotlin.time.Duration.Companion.seconds
 
-private fun PostHogFake.event(name: String) = sent().single { it.string("event") == name }
+private fun PostHogFake.event(name: String) = assertCaptured(name).json
 
 class BackgroundContextTest :
     FunSpec({

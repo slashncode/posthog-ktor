@@ -28,7 +28,7 @@ import kotlinx.serialization.json.jsonObject
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 
-private fun PostHogFake.event(name: String) = sent().single { it.string("event") == name }
+private fun PostHogFake.event(name: String) = assertCaptured(name).json
 
 private val basicAuth = "Basic " + Base64.getEncoder().encodeToString("ada:secret".toByteArray())
 

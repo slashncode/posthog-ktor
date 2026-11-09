@@ -62,7 +62,7 @@ class FeatureFlagsTest :
                 eventually(10.seconds) { fake.exposures().size shouldBe 2 }
                 fake.exposures() shouldContainExactlyInAnyOrder listOf("new-checkout" to "true", "checkout-copy" to "calm")
                 for (name in listOf("checkout_viewed", "\$exception")) {
-                    val event = fake.sent().single { it.string("event") == name }
+                    val event = fake.assertCaptured(name).json
                     event.property("\$feature/new-checkout") shouldBe "true"
                     event.property("\$feature/checkout-copy") shouldBe "calm"
                     event.property("\$feature/deal-countdown") shouldBe null
@@ -119,7 +119,7 @@ class FeatureFlagsTest :
                 request["person_properties"]!!.jsonObject["plan"]!!.jsonPrimitive.content shouldBe "pro"
                 request["groups"]!!.jsonObject["company"]!!.jsonPrimitive.content shouldBe "nothing-gmbh"
                 eventually(10.seconds) { fake.sent().any { it.string("event") == "logged_in" } shouldBe true }
-                fake.sent().single { it.string("event") == "logged_in" }.property("\$feature/new-checkout") shouldBe null
+                fake.assertCaptured("logged_in").json.property("\$feature/new-checkout") shouldBe null
             }
         }
 

@@ -102,7 +102,7 @@ class FlagRoutesTest :
                         Triple("anon-1", "checkout-copy", "calm"),
                         Triple("ada", "new-checkout", "true"),
                     )
-                fake.sent().single { it.string("event") == "checkout_viewed" }.property("\$route") shouldBe "/checkout"
+                fake.assertCaptured("checkout_viewed").json.property("\$route") shouldBe "/checkout"
             }
         }
 
@@ -163,7 +163,7 @@ class FlagRoutesTest :
                         .jsonPrimitive.content shouldBe
                         "</script><script>alert(1)</script>"
                     eventually(10.seconds) { fake.sent().any { it.string("event") == "page_rendered" } shouldBe true }
-                    fake.sent().single { it.string("event") == "page_rendered" }.string("distinct_id") shouldBe id
+                    fake.assertCaptured("page_rendered").json.string("distinct_id") shouldBe id
 
                     client.get("/page").bodyAsText() shouldBe """{"featureFlags":{},"featureFlagPayloads":{}}"""
 
