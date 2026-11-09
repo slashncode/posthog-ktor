@@ -45,6 +45,19 @@ tasks.withType<Test>().configureEach {
     }
 }
 
+// Module docs from Module.md; sources linked to GitHub.
+dokka {
+    dokkaSourceSets.configureEach {
+        val moduleDocs = layout.projectDirectory.file("Module.md")
+        if (moduleDocs.asFile.exists()) includes.from(moduleDocs)
+        sourceLink {
+            localDirectory.set(layout.projectDirectory.dir("src/main/kotlin"))
+            remoteUrl("https://github.com/slashncode/posthog-ktor/tree/main/${project.name}/src/main/kotlin")
+            remoteLineSuffix.set("#L")
+        }
+    }
+}
+
 mavenPublishing {
     configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaGeneratePublicationHtml"), sourcesJar = true))
     publishToMavenCentral()

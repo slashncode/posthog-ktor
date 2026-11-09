@@ -1,6 +1,7 @@
 package io.github.slashncode.posthog.ktor
 
 import com.posthog.server.otel.PostHogContextSpanProcessor
+import io.github.slashncode.posthog.ktor.test.PostHogFake
 import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
@@ -26,12 +27,12 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import kotlin.time.Duration.Companion.seconds
 
-private fun FakePostHog.event(name: String) = events().single { it.string("event") == name }
+private fun PostHogFake.event(name: String) = sent().single { it.string("event") == name }
 
 class BackgroundContextTest :
     FunSpec({
         test("work outside a call captures with the context it is given, across threads") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog)
                     val posthog = posthog
@@ -52,7 +53,7 @@ class BackgroundContextTest :
                     client.get("/run")
                 }
 
-                eventually(10.seconds) { fake.events().size shouldBe 2 }
+                eventually(10.seconds) { fake.sent().size shouldBe 2 }
                 val job = fake.event("job_ran")
                 job.string("distinct_id") shouldBe "user-1"
                 job.property("\$session_id") shouldBe "session-1"
@@ -63,7 +64,7 @@ class BackgroundContextTest :
         }
 
         test("a call's context goes to a queue as headers, and as a snapshot to work that outlives the call") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 val outlived = CompletableDeferred<Unit>()
                 postHogTest(fake, {
                     install(PostHog)
@@ -88,7 +89,7 @@ class BackgroundContextTest :
                     outlived.await()
                 }
 
-                eventually(10.seconds) { fake.events().size shouldBe 1 }
+                eventually(10.seconds) { fake.sent().size shouldBe 1 }
                 val event = fake.event("order_followed_up")
                 event.string("distinct_id") shouldBe "anon-1"
                 event.property("\$session_id") shouldBe "session-1"

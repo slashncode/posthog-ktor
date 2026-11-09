@@ -1,0 +1,32 @@
+public final class io/github/slashncode/posthog/ktor/test/CapturedEvent {
+	public final fun getDistinctId ()Ljava/lang/String;
+	public final fun getEvent ()Ljava/lang/String;
+	public final fun getFlags ()Ljava/util/Map;
+	public final fun getJson ()Lkotlinx/serialization/json/JsonObject;
+	public final fun getProperties ()Lkotlinx/serialization/json/JsonObject;
+	public final fun property (Ljava/lang/String;)Ljava/lang/Object;
+	public final fun property (Ljava/lang/String;Ljava/lang/Object;)V
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/slashncode/posthog/ktor/test/PostHogFake : java/lang/AutoCloseable {
+	public fun <init> ()V
+	public final fun applicationConfig (Lio/ktor/server/config/ApplicationConfig;)Lio/ktor/server/config/ApplicationConfig;
+	public static synthetic fun applicationConfig$default (Lio/github/slashncode/posthog/ktor/test/PostHogFake;Lio/ktor/server/config/ApplicationConfig;ILjava/lang/Object;)Lio/ktor/server/config/ApplicationConfig;
+	public final fun assertCaptured-8Mi8wO0 (Ljava/lang/String;JLkotlin/jvm/functions/Function1;)Lio/github/slashncode/posthog/ktor/test/CapturedEvent;
+	public static synthetic fun assertCaptured-8Mi8wO0$default (Lio/github/slashncode/posthog/ktor/test/PostHogFake;Ljava/lang/String;JLkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/slashncode/posthog/ktor/test/CapturedEvent;
+	public final fun assertNotCaptured-HG0u8IE (Ljava/lang/String;J)V
+	public static synthetic fun assertNotCaptured-HG0u8IE$default (Lio/github/slashncode/posthog/ktor/test/PostHogFake;Ljava/lang/String;JILjava/lang/Object;)V
+	public final fun captured (Ljava/lang/String;)Ljava/util/List;
+	public fun close ()V
+	public final fun flag (Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;)V
+	public static synthetic fun flag$default (Lio/github/slashncode/posthog/ktor/test/PostHogFake;Ljava/lang/String;Ljava/lang/Object;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun getEvents ()Ljava/util/List;
+	public final fun getFlagDefinitions ()Ljava/lang/String;
+	public final fun getFlagRequests ()Ljava/util/List;
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getProjectToken ()Ljava/lang/String;
+	public final fun reset ()V
+	public final fun setFlagDefinitions (Ljava/lang/String;)V
+}
+

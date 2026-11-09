@@ -96,6 +96,8 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
 	public final fun getCaptureWithoutDistinctId ()Z
 	public final fun getClient ()Lcom/posthog/server/PostHogInterface;
 	public final fun getExcludedExceptions ()Ljava/util/Set;
+	public final fun getFlushAt ()Ljava/lang/Integer;
+	public final fun getFlushIntervalSeconds ()Ljava/lang/Integer;
 	public final fun getHost ()Ljava/lang/String;
 	public final fun getLogContext ()Z
 	public final fun getProjectToken ()Ljava/lang/String;
@@ -110,6 +112,8 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
 	public final fun setCaptureIp (Z)V
 	public final fun setCaptureWithoutDistinctId (Z)V
 	public final fun setClient (Lcom/posthog/server/PostHogInterface;)V
+	public final fun setFlushAt (Ljava/lang/Integer;)V
+	public final fun setFlushIntervalSeconds (Ljava/lang/Integer;)V
 	public final fun setHost (Ljava/lang/String;)V
 	public final fun setLogContext (Z)V
 	public final fun setProjectToken (Ljava/lang/String;)V
@@ -123,6 +127,11 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginKt {
 	public static final field SESSION_ID_HEADER Ljava/lang/String;
 	public static final fun getPostHog ()Lio/ktor/server/application/ApplicationPlugin;
 	public static final fun getPosthog (Lio/ktor/server/application/Application;)Lio/github/slashncode/posthog/ktor/PostHogClient;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogProxyKt {
+	public static final fun posthogProxy (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lio/ktor/server/routing/Route;
+	public static synthetic fun posthogProxy$default (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/ktor/server/routing/Route;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogRoutesKt {

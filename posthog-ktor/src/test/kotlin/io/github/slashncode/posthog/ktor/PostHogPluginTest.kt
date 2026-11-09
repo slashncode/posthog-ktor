@@ -1,5 +1,6 @@
 package io.github.slashncode.posthog.ktor
 
+import io.github.slashncode.posthog.ktor.test.PostHogFake
 import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
@@ -24,10 +25,10 @@ class PostHogPluginTest :
         }
 
         test("the posthog section of the application config sets it up; events leave on shutdown at the latest") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 testApplication {
                     environment {
-                        config = MapApplicationConfig("posthog.projectToken" to "phc_test", "posthog.host" to fake.url)
+                        config = MapApplicationConfig("posthog.projectToken" to "phc_test", "posthog.host" to fake.host)
                     }
                     application {
                         install(PostHog)
@@ -38,8 +39,8 @@ class PostHogPluginTest :
                     startApplication()
                 }
 
-                eventually(10.seconds) { fake.events().size shouldBe 1 }
-                val event = fake.events().single()
+                eventually(10.seconds) { fake.sent().size shouldBe 1 }
+                val event = fake.sent().single()
                 event.string("event") shouldBe "order_placed"
                 event.string("distinct_id") shouldBe "user-7"
                 event.property("items") shouldBe "2"
@@ -48,13 +49,13 @@ class PostHogPluginTest :
         }
 
         test("the install block wins over the application config") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 testApplication {
                     environment { config = MapApplicationConfig("posthog.projectToken" to "phc_from_config") }
                     application {
                         install(PostHog) {
                             projectToken = null
-                            host = fake.url
+                            host = fake.host
                         }
 
                         posthog.isEnabled shouldBe false

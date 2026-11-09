@@ -55,6 +55,12 @@ public class PostHogPluginConfig internal constructor(
      */
     public var secretKey: String? = config.string("secretKey")
 
+    /** How many events are queued before they are sent; the SDK's default if null. Tests use 1. */
+    public var flushAt: Int? = config.int("flushAt")
+
+    /** How often queued events are sent at the latest, in seconds; the SDK's default if null. */
+    public var flushIntervalSeconds: Int? = config.int("flushIntervalSeconds")
+
     /**
      * A client created elsewhere, used instead of one built from this configuration. The plugin
      * does not close it; whoever created it does.
@@ -178,6 +184,8 @@ public class PostHogPluginConfig internal constructor(
         fun ApplicationConfig.string(key: String) = propertyOrNull(key)?.getString()?.takeIf { it.isNotBlank() }
 
         fun ApplicationConfig.boolean(key: String) = propertyOrNull(key)?.getString()?.toBooleanStrictOrNull()
+
+        fun ApplicationConfig.int(key: String) = propertyOrNull(key)?.getString()?.toIntOrNull()
     }
 }
 
@@ -211,7 +219,7 @@ public val PostHog: ApplicationPlugin<PostHogPluginConfig> =
         val config = pluginConfig
         val owned = config.client == null
         val sdk = config.client ?: config.buildClient()
-        val client = PostHogClient(sdk, config.captureWithoutDistinctId)
+        val client = PostHogClient(sdk, config.captureWithoutDistinctId, config.host)
         application.attributes.put(clientKey, client)
         if (owned && sdk != null) {
             application.monitor.subscribe(ApplicationStopped) { sdk.close() }
@@ -303,6 +311,8 @@ private fun PostHogPluginConfig.buildClient(): PostHogInterface? {
     val token = projectToken ?: return null
     val builder = PostHogSdkConfig.builder(token).host(host)
     secretKey?.let { builder.personalApiKey(it).localEvaluation(true) }
+    flushAt?.let { builder.flushAt(it) }
+    flushIntervalSeconds?.let { builder.flushIntervalSeconds(it) }
     builder.sdk()
     return PostHogSdk.with(builder.build())
 }

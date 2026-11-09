@@ -3,6 +3,7 @@ package io.github.slashncode.posthog.ktor
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import io.github.slashncode.posthog.ktor.test.PostHogFake
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.shouldBe
@@ -29,7 +30,7 @@ class LogContextTest :
         fun lines(message: String) = appender.list.filter { it.formattedMessage.contains(message) }
 
         test("log lines of a call, on any thread, and CallLogging's request line carry the PostHog ids") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(CallLogging) {
                         posthogContext()
@@ -61,7 +62,7 @@ class LogContextTest :
         }
 
         test("the log context can be turned off") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog) { logContext = false }
                     routing {

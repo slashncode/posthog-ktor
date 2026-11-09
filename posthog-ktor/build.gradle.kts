@@ -13,6 +13,7 @@ dependencies {
     // Only for CallLoggingConfig.posthogContext(); apps without CallLogging never load it.
     compileOnly(libs.ktor.server.call.logging)
 
+    testImplementation(project(":posthog-ktor-test"))
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.ktor.server.netty)
     testImplementation(libs.ktor.server.call.logging)

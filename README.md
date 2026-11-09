@@ -16,10 +16,10 @@ PostHog has integrations for Django, Rails, Laravel, ASP.NET Core, Express and N
 | **Logs** | The PostHog ids in the MDC of every log line of a call, CallLogging's request line included, for PostHog Logs | ✓ |
 | **Feature flags** | One evaluation per request, payloads decoded with kotlinx.serialization, routes gated by a flag (`featureFlag("new-checkout") { … }`), the flags a request read attached to its events | ✓ |
 | **Bootstrapping posthog-js** | A route that hands a single-page app its flags before the first render, and the same for server-rendered pages, without counting an exposure | ✓ |
-| **Reverse proxy** | `/ingest` forwarded to PostHog, so ad blockers do not drop events | |
+| **Reverse proxy** | `/ingest` forwarded to PostHog, so ad blockers do not drop events | ✓ |
 | **Traces** | The PostHog ids on the OpenTelemetry server span and every span inside a call, through the official SDK's span processor | ✓ |
 | **Beyond the request** | The context for background jobs and message consumers, through message headers; a Ktor `HttpClient` plugin passing it on to other services (`posthog-ktor-client`) | ✓ |
-| **Tests** | A fake client with assertions (`assertCaptured("order_placed")`) and a fake PostHog server | |
+| **Tests** | A fake PostHog server for the real client, with scripted flags and assertions (`assertCaptured("order_placed") { property("total", 12) }`), in `posthog-ktor-test` | ✓ |
 
 ## Usage
 
@@ -28,6 +28,7 @@ dependencies {
     implementation("io.github.slashncode:posthog-ktor:<version>")
     // Optional: passes the PostHog ids on to services called with Ktor's HttpClient.
     implementation("io.github.slashncode:posthog-ktor-client:<version>")
+    testImplementation("io.github.slashncode:posthog-ktor-test:<version>")
 }
 ```
 
@@ -99,7 +100,20 @@ Flags are evaluated for the call's distinct id; without one (no consent, no trac
 | `logContext` | `true` | `posthogDistinctId` and `sessionId` in the MDC |
 | `flagContext { call -> }` | – | Person properties, groups and group properties for flag evaluation (`PostHogEvaluateFlagsOptions.Builder`) |
 | `attachAccessedFlags` | `true` | Events of a call carry the flags it read (`$feature/<key>`, `$active_feature_flags`) |
+| `flushAt`, `flushIntervalSeconds` | SDK defaults | When queued events are sent |
 | `sdk { }` | – | Every other option of `posthog-server` |
+
+### Reverse proxy
+
+```kotlin
+routing { posthogProxy("/ingest") }
+```
+
+```ts
+posthog.init('phc_…', { api_host: '/ingest', ui_host: 'https://eu.posthog.com' })
+```
+
+posthog-js then talks to the app's own origin, which ad blockers leave alone. Scripts (`/ingest/static/…`) come from PostHog's assets host, everything else goes to the plugin's `host`; bodies stream through compressed as they came. The visitor's cookies and `Authorization` stay behind, PostHog's `Set-Cookie` does not come back, and PostHog gets the visitor's address in `X-Forwarded-For` for GeoIP.
 
 ### Beyond the request
 
@@ -146,11 +160,41 @@ install(KtorServerTelemetry) { setOpenTelemetry(tracing) }
 
 Outside a call, `application.posthog.withContext { }` binds the context to the client, which the processor needs.
 
+### Testing
+
+`posthog-ktor-test` runs the real client against a local fake PostHog: what the app captures arrives there, flags come from the test.
+
+```kotlin
+PostHogFake().use { posthog ->
+    posthog.flag("new-checkout", true)
+    testApplication {
+        environment { config = posthog.applicationConfig() }
+        application { module() }
+
+        client.post("/checkout") { header(DISTINCT_ID_HEADER, "anon-1") }
+
+        posthog.assertCaptured("order_placed") {
+            property("total", 12)
+            flags shouldBe mapOf("new-checkout" to true)
+        }
+        posthog.assertNotCaptured("order_failed")
+    }
+}
+```
+
+## Sample
+
+[`samples/shop`](samples/shop) is a one-page shop with PostHog on both sides: posthog-js through the app's `/ingest` proxy, bootstrapped with the server's flags, a server-rendered experiment, a route behind a flag, and tests on `PostHogFake`. `POSTHOG_PROJECT_TOKEN=phc_… ./gradlew :samples:shop:run` serves it on port 8080; without a token it runs with PostHog off.
+
+## API reference
+
+[slashncode.github.io/posthog-ktor](https://slashncode.github.io/posthog-ktor/) (Dokka, from `main`).
+
 ## Development
 
 - `./gradlew build` builds and tests everything (JDK 25 from the Gradle toolchain); `-PtestJdk=17` runs the tests on another JVM.
 - The public API is recorded in `*/api/*.api`; after an intended change, `./gradlew updateKotlinAbi`.
-- `./gradlew ktlintFormat` formats.
+- `./gradlew ktlintFormat` formats; `./gradlew :dokkaGenerate` writes the API reference to `build/dokka/html`.
 - Releases: a tag `vX.Y.Z` publishes to Maven Central; a manual run of the `release` workflow uploads a version for validation only.
 
 Requires Java 17 or newer and Ktor 3.

@@ -1,6 +1,6 @@
 package io.github.slashncode.posthog.ktor
 
-import io.github.slashncode.posthog.ktor.FakePostHog.Flag
+import io.github.slashncode.posthog.ktor.test.PostHogFake
 import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.collections.shouldContainAll
@@ -39,15 +39,15 @@ private val flags =
 
 private val basicAuth = "Basic " + Base64.getEncoder().encodeToString("ada:secret".toByteArray())
 
-private fun FakePostHog.exposures() =
-    events().filter { it.string("event") == "\$feature_flag_called" }.map {
+private fun PostHogFake.exposures() =
+    sent().filter { it.string("event") == "\$feature_flag_called" }.map {
         Triple(it.string("distinct_id"), it.property("\$feature_flag"), it.property("\$feature_flag_response"))
     }
 
 class FlagRoutesTest :
     FunSpec({
         test("routes behind a flag exist only while it is on, for the variant asked for, after authentication") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 fake.remoteFlags = flags
                 postHogTest(fake, {
                     install(Authentication) { basic("basic") { validate { UserIdPrincipal(it.name) } } }
@@ -78,7 +78,7 @@ class FlagRoutesTest :
                     suspend fun get(path: String) = client.get(path) { header(DISTINCT_ID_HEADER, "anon-1") }
 
                     get("/health").bodyAsText() shouldBe "ok"
-                    fake.flagRequests().size shouldBe 0
+                    fake.flagRequests.size shouldBe 0
 
                     get("/checkout").bodyAsText() shouldBe "new"
                     get("/coach").status shouldBe HttpStatusCode.NotFound
@@ -93,7 +93,7 @@ class FlagRoutesTest :
                 }
 
                 // One evaluation per call that reached a gate; the protected one for the principal.
-                fake.flagRequests().map { it.string("distinct_id") } shouldBe listOf("anon-1", "anon-1", "anon-1", "anon-1", "ada")
+                fake.flagRequests.map { it.string("distinct_id") } shouldBe listOf("anon-1", "anon-1", "anon-1", "anon-1", "ada")
                 eventually(10.seconds) { fake.exposures().size shouldBe 4 }
                 fake.exposures() shouldContainAll
                     listOf(
@@ -102,12 +102,12 @@ class FlagRoutesTest :
                         Triple("anon-1", "checkout-copy", "calm"),
                         Triple("ada", "new-checkout", "true"),
                     )
-                fake.events().single { it.string("event") == "checkout_viewed" }.property("\$route") shouldBe "/checkout"
+                fake.sent().single { it.string("event") == "checkout_viewed" }.property("\$route") shouldBe "/checkout"
             }
         }
 
         test("the bootstrap route answers the flags asked for with their payloads, without an exposure, never cached") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 fake.remoteFlags = flags
                 postHogTest(fake, {
                     install(PostHog)
@@ -127,8 +127,8 @@ class FlagRoutesTest :
 
                     // posthog-js' cookie stands in for the header (navigations, fetches without tracing headers).
                     val cookie = """{"distinct_id":"cookie-1","${'$'}sesid":[1,"s",1]}""".encodeURLParameter()
-                    client.get("/flags") { header(HttpHeaders.Cookie, "ph_phc_test_posthog=$cookie") }
-                    fake.flagRequests().last().string("distinct_id") shouldBe "cookie-1"
+                    client.get("/flags") { header(HttpHeaders.Cookie, "ph_${fake.projectToken}_posthog=$cookie") }
+                    fake.flagRequests.last().string("distinct_id") shouldBe "cookie-1"
                 }
 
                 delay(500)
@@ -137,7 +137,7 @@ class FlagRoutesTest :
         }
 
         test("a server-rendered page's bootstrap: the call's id, else a minted one the call captures with; script-safe") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 fake.remoteFlags = mapOf("new-checkout" to Flag(true, """{"note":"</script><script>alert(1)</script>"}"""))
                 postHogTest(fake, {
                     install(PostHog) { resolveDistinctId { it.request.headers["X-User"] } }
@@ -162,8 +162,8 @@ class FlagRoutesTest :
                         .jsonObject["note"]!!
                         .jsonPrimitive.content shouldBe
                         "</script><script>alert(1)</script>"
-                    eventually(10.seconds) { fake.events().any { it.string("event") == "page_rendered" } shouldBe true }
-                    fake.events().single { it.string("event") == "page_rendered" }.string("distinct_id") shouldBe id
+                    eventually(10.seconds) { fake.sent().any { it.string("event") == "page_rendered" } shouldBe true }
+                    fake.sent().single { it.string("event") == "page_rendered" }.string("distinct_id") shouldBe id
 
                     client.get("/page").bodyAsText() shouldBe """{"featureFlags":{},"featureFlagPayloads":{}}"""
 

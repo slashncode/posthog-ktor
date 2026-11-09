@@ -10,6 +10,13 @@ Toolchain from the workspace `mise.toml` (`mise exec -- …`).
 - `./gradlew ktlintFormat` — format
 - `./gradlew updateKotlinAbi` — record an intended public API change in `*/api/*.api`
 - `./gradlew publishToMavenLocal` — local publication (unsigned)
+- `./gradlew :dokkaGenerate` — API reference of all modules in `build/dokka/html` (deployed to GitHub Pages from `main` by `docs.yml`)
+- `./gradlew :samples:shop:run` — the sample app on port 8080 (`POSTHOG_PROJECT_TOKEN` to turn PostHog on)
+
+## Layout
+
+- `posthog-ktor` — the server plugin; `posthog-ktor-client` — the `HttpClient` plugin; `posthog-ktor-test` — `PostHogFake` (the library's own tests run on it); `samples/shop` — not published.
+- `build-logic` — convention plugins: `posthog-ktor.library` (published modules), `posthog-ktor.sample`, `posthog-ktor.docs` (root).
 
 ## Rules
 

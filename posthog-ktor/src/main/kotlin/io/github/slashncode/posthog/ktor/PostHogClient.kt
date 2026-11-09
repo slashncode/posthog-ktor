@@ -15,6 +15,7 @@ public class PostHogClient internal constructor(
     /** The official SDK's client, for everything this library does not wrap; null while PostHog is off. */
     public val sdk: PostHogInterface?,
     private val captureWithoutDistinctId: Boolean,
+    internal val host: String = POSTHOG_US_HOST,
 ) {
     /** Whether events actually go to PostHog. */
     public val isEnabled: Boolean get() = sdk != null

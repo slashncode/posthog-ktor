@@ -1,5 +1,6 @@
 package io.github.slashncode.posthog.ktor
 
+import io.github.slashncode.posthog.ktor.test.PostHogFake
 import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.assertions.withClue
 import io.kotest.core.spec.style.FunSpec
@@ -31,12 +32,12 @@ private fun Application.failingRoutes() {
     }
 }
 
-private fun FakePostHog.exceptions() = events().filter { it.string("event") == "\$exception" }
+private fun PostHogFake.exceptions() = sent().filter { it.string("event") == "\$exception" }
 
 class ExceptionCaptureTest :
     FunSpec({
         test("a failed call goes to error tracking with its ids and request properties") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog)
                     failingRoutes()
@@ -61,7 +62,7 @@ class ExceptionCaptureTest :
 
         test("only server errors by default: client errors, StatusPages' 4xx and excluded exceptions stay out") {
             for (statusPagesFirst in listOf(true, false)) {
-                FakePostHog().use { fake ->
+                PostHogFake().use { fake ->
                     postHogTest(fake, {
                         val statusPages: Application.() -> Unit = {
                             install(StatusPages) { exception<DishMissing> { call, _ -> call.respond(HttpStatusCode.NotFound) } }
@@ -86,7 +87,7 @@ class ExceptionCaptureTest :
         }
 
         test("what is reported is configurable: statuses, exclusions, a filter, or nothing") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(StatusPages) { exception<DishMissing> { call, _ -> call.respond(HttpStatusCode.NotFound) } }
                     install(PostHog) {
@@ -106,7 +107,7 @@ class ExceptionCaptureTest :
                 fake.exceptions().map { it.property("\$request_path") }.toSet() shouldBe setOf("/missing", "/bad")
             }
 
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog) { captureExceptions = false }
                     failingRoutes()

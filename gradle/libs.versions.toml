@@ -29,6 +29,7 @@ ktor-server-status-pages = { module = "io.ktor:ktor-server-status-pages" }
 ktor-server-auth = { module = "io.ktor:ktor-server-auth" }
 ktor-server-forwarded-header = { module = "io.ktor:ktor-server-forwarded-header" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty" }
+ktor-server-html-builder = { module = "io.ktor:ktor-server-html-builder" }
 ktor-client-core = { module = "io.ktor:ktor-client-core" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock" }
 opentelemetry-bom = { module = "io.opentelemetry:opentelemetry-bom", version.ref = "opentelemetry" }

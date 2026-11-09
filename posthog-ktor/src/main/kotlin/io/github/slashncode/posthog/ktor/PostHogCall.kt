@@ -230,6 +230,8 @@ internal class PostHogCallState(
         flagKeys: Collection<String>,
         mintDistinctId: Boolean,
     ): PostHogBootstrap {
+        // While PostHog is off there is nothing to bootstrap, and no reason to name anyone.
+        if (client.sdk == null) return PostHogBootstrap(null, false, emptyMap(), emptyMap())
         if (distinctId == null) {
             bootstrapped = cookieDistinctId() ?: if (mintDistinctId) mintedDistinctId() else null
         }

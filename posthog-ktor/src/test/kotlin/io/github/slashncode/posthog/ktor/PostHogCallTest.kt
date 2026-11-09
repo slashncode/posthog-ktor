@@ -1,5 +1,6 @@
 package io.github.slashncode.posthog.ktor
 
+import io.github.slashncode.posthog.ktor.test.PostHogFake
 import io.kotest.assertions.nondeterministic.eventually
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.maps.shouldNotContainKey
@@ -27,14 +28,14 @@ import kotlinx.serialization.json.jsonObject
 import java.util.Base64
 import kotlin.time.Duration.Companion.seconds
 
-private fun FakePostHog.event(name: String) = events().single { it.string("event") == name }
+private fun PostHogFake.event(name: String) = sent().single { it.string("event") == name }
 
 private val basicAuth = "Basic " + Base64.getEncoder().encodeToString("ada:secret".toByteArray())
 
 class PostHogCallTest :
     FunSpec({
         test("events of a call carry the browser's ids and the request's properties") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(XForwardedHeaders)
                     install(PostHog)
@@ -53,7 +54,7 @@ class PostHogCallTest :
                     }
                 }
 
-                eventually(10.seconds) { fake.events().size shouldBe 1 }
+                eventually(10.seconds) { fake.sent().size shouldBe 1 }
                 val event = fake.event("menu_viewed")
                 event.string("distinct_id") shouldBe "anon-1"
                 event.property("\$session_id") shouldBe "session-9"
@@ -68,7 +69,7 @@ class PostHogCallTest :
         }
 
         test("the authenticated user wins over the header; identify over both; an explicit id over everything") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(Authentication) {
                         basic("basic") { validate { UserIdPrincipal(it.name) } }
@@ -97,7 +98,7 @@ class PostHogCallTest :
                     client.get("/public") { header(DISTINCT_ID_HEADER, "anon-1") }
                 }
 
-                eventually(10.seconds) { fake.events().count { !it.string("event")!!.startsWith("$") } shouldBe 4 }
+                eventually(10.seconds) { fake.sent().count { !it.string("event")!!.startsWith("$") } shouldBe 4 }
                 fake.event("\$identify").string("distinct_id") shouldBe "ada-renamed"
                 fake.event("as_user").string("distinct_id") shouldBe "ada"
                 fake.event("as_user").property("\$route") shouldBe "/orders/{id}"
@@ -108,7 +109,7 @@ class PostHogCallTest :
         }
 
         test("the context survives thread switches and reaches direct SDK calls") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog)
                     routing {
@@ -130,7 +131,7 @@ class PostHogCallTest :
                     }
                 }
 
-                eventually(10.seconds) { fake.events().size shouldBe 2 }
+                eventually(10.seconds) { fake.sent().size shouldBe 2 }
                 listOf("on_another_thread", "straight_to_the_sdk").forEach { name ->
                     fake.event(name).string("distinct_id") shouldBe "anon-2"
                     fake.event(name).property("\$session_id") shouldBe "session-2"
@@ -140,7 +141,7 @@ class PostHogCallTest :
         }
 
         test("without any id an event goes out without a person, or not at all when that is turned off") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog)
                     routing {
@@ -151,13 +152,13 @@ class PostHogCallTest :
                     }
                 }) { client.get("/") }
 
-                eventually(10.seconds) { fake.events().size shouldBe 1 }
+                eventually(10.seconds) { fake.sent().size shouldBe 1 }
                 val event = fake.event("anonymous")
                 event.string("distinct_id") shouldNotBe null
                 event.property("\$process_person_profile") shouldBe "false"
             }
 
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog) { captureWithoutDistinctId = false }
                     routing {
@@ -169,12 +170,12 @@ class PostHogCallTest :
                     }
                 }) { client.get("/") }
 
-                eventually(10.seconds) { fake.events().map { it.string("event") } shouldBe listOf("kept") }
+                eventually(10.seconds) { fake.sent().map { it.string("event") } shouldBe listOf("kept") }
             }
         }
 
         test("tracing headers can be ignored; properties can be added, changed and left out; calls can be skipped") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog) {
                         useTracingHeaders = false
@@ -198,7 +199,7 @@ class PostHogCallTest :
                     client.get("/health")
                 }
 
-                eventually(10.seconds) { fake.events().size shouldBe 2 }
+                eventually(10.seconds) { fake.sent().size shouldBe 2 }
                 val tidy = fake.event("tidy").getValue("properties").jsonObject
                 fake.event("tidy").property("\$process_person_profile") shouldBe "false"
                 tidy.string("service") shouldBe "ordering"
@@ -211,7 +212,7 @@ class PostHogCallTest :
         }
 
         test("tracing headers are trimmed and capped at 1,000 characters") {
-            FakePostHog().use { fake ->
+            PostHogFake().use { fake ->
                 postHogTest(fake, {
                     install(PostHog)
                     routing {
@@ -224,7 +225,7 @@ class PostHogCallTest :
                     client.get("/") { header(DISTINCT_ID_HEADER, "  anon-" + "x".repeat(2000)) }
                 }
 
-                eventually(10.seconds) { fake.events().size shouldBe 1 }
+                eventually(10.seconds) { fake.sent().size shouldBe 1 }
                 fake.event("cleaned").string("distinct_id") shouldBe ("anon-" + "x".repeat(995))
             }
         }
