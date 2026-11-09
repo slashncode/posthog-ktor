@@ -43,6 +43,9 @@ public final class io/github/slashncode/posthog/ktor/PostHogClient {
 	public final fun identify (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)V
 	public static synthetic fun identify$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)V
 	public final fun isEnabled ()Z
+	public final fun withContext (Lio/github/slashncode/posthog/ktor/PostHogContext;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun withContext (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun withContext$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogContext : kotlin/coroutines/AbstractCoroutineContextElement, kotlinx/coroutines/ThreadContextElement {
@@ -53,11 +56,14 @@ public final class io/github/slashncode/posthog/ktor/PostHogContext : kotlin/cor
 	public final fun getProperties ()Ljava/util/Map;
 	public final fun getSessionId ()Ljava/lang/String;
 	public fun restoreThreadContext (Lkotlin/coroutines/CoroutineContext;Ljava/lang/Object;)V
+	public final fun snapshot ()Lio/github/slashncode/posthog/ktor/PostHogContext;
+	public final fun toHeaders ()Ljava/util/Map;
 	public fun updateThreadContext (Lkotlin/coroutines/CoroutineContext;)Ljava/lang/Object;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogContext$Key : kotlin/coroutines/CoroutineContext$Key {
 	public final fun current (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun fromHeaders (Ljava/util/Map;)Lio/github/slashncode/posthog/ktor/PostHogContext;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogContextKt {

@@ -4,6 +4,7 @@ import com.posthog.server.PostHogCaptureOptions
 import com.posthog.server.PostHogFeatureFlagEvaluations
 import com.posthog.server.PostHogInterface
 import com.posthog.server.PostHogRequestContext
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * The application's PostHog client. Inside a call, or a [PostHogContext], captures without an
@@ -93,6 +94,25 @@ public class PostHogClient internal constructor(
         val options = options(contextProperties + properties.withoutNulls(), flagsFor(id))
         if (id == null) client.captureException(error, options) else client.captureException(error, id, options)
     }
+
+    /**
+     * Runs [block] in [context], bound to this client: events captured inside carry its distinct
+     * id, session id and properties, also after suspensions and on other threads, and spans started
+     * inside get its ids if the official SDK's `PostHogContextSpanProcessor` for this client is
+     * registered. For consumers and jobs: `application.posthog.withContext(PostHogContext.fromHeaders(headers)) { … }`.
+     */
+    public suspend fun <T> withContext(
+        context: PostHogContext,
+        block: suspend CoroutineScope.() -> T,
+    ): T = kotlinx.coroutines.withContext(context.ownedBy(sdk), block)
+
+    /** Runs [block] in a context of [distinctId], [sessionId] and [properties]; see the other overload. */
+    public suspend fun <T> withContext(
+        distinctId: String?,
+        sessionId: String? = null,
+        properties: Map<String, Any?> = emptyMap(),
+        block: suspend CoroutineScope.() -> T,
+    ): T = withContext(PostHogContext(distinctId, sessionId, properties), block)
 
     /** Sends what is queued now instead of with the next batch. */
     public fun flush() {

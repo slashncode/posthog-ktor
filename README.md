@@ -17,8 +17,8 @@ PostHog has integrations for Django, Rails, Laravel, ASP.NET Core, Express and N
 | **Feature flags** | One evaluation per request, payloads decoded with kotlinx.serialization, routes gated by a flag (`featureFlag("new-checkout") { … }`), the flags a request read attached to its events | ✓ |
 | **Bootstrapping posthog-js** | A route that hands a single-page app its flags before the first render, and the same for server-rendered pages, without counting an exposure | ✓ |
 | **Reverse proxy** | `/ingest` forwarded to PostHog, so ad blockers do not drop events | |
-| **Traces** | The PostHog ids on the OpenTelemetry server span | |
-| **Beyond the request** | The context for background jobs and message consumers; a Ktor `HttpClient` plugin passing it on to other services | |
+| **Traces** | The PostHog ids on the OpenTelemetry server span and every span inside a call, through the official SDK's span processor | ✓ |
+| **Beyond the request** | The context for background jobs and message consumers, through message headers; a Ktor `HttpClient` plugin passing it on to other services (`posthog-ktor-client`) | ✓ |
 | **Tests** | A fake client with assertions (`assertCaptured("order_placed")`) and a fake PostHog server | |
 
 ## Usage
@@ -26,6 +26,8 @@ PostHog has integrations for Django, Rails, Laravel, ASP.NET Core, Express and N
 ```kotlin
 dependencies {
     implementation("io.github.slashncode:posthog-ktor:<version>")
+    // Optional: passes the PostHog ids on to services called with Ktor's HttpClient.
+    implementation("io.github.slashncode:posthog-ktor-client:<version>")
 }
 ```
 
@@ -98,6 +100,51 @@ Flags are evaluated for the call's distinct id; without one (no consent, no trac
 | `flagContext { call -> }` | – | Person properties, groups and group properties for flag evaluation (`PostHogEvaluateFlagsOptions.Builder`) |
 | `attachAccessedFlags` | `true` | Events of a call carry the flags it read (`$feature/<key>`, `$active_feature_flags`) |
 | `sdk { }` | – | Every other option of `posthog-server` |
+
+### Beyond the request
+
+```kotlin
+// A consumer or job: everything captured inside belongs to this person, on any thread.
+application.posthog.withContext(distinctId = order.customerId) {
+    application.posthog.capture("order_delivered")
+}
+
+// Through a queue, e.g. Kafka: the ids travel as headers and come back as a context.
+val record = ProducerRecord(topic, key, value)
+PostHogContext.current()?.toHeaders()?.forEach { (name, id) -> record.headers().add(name, id.toByteArray()) }
+// … and in the consumer:
+val headers = record.headers().associate { it.key() to it.value().decodeToString() }
+application.posthog.withContext(PostHogContext.fromHeaders(headers) ?: PostHogContext()) { handle(record) }
+
+// Work that outlives the call: a snapshot of the call's context.
+application.launch(PostHogContext.current()!!.snapshot()) { /* … */ }
+```
+
+Calls to other services carry the ids with the client plugin from `io.github.slashncode:posthog-ktor-client`, only to the hosts it names:
+
+```kotlin
+val orders = HttpClient(CIO) {
+    install(PostHogTracingHeaders) { hosts += listOf("orders.internal", "*.svc.cluster.local") }
+}
+```
+
+### Traces
+
+posthog-server ships `PostHogContextSpanProcessor`, which writes `posthogDistinctId` and `sessionId` on spans. posthog-ktor hands the SDK each call's context whenever the call's coroutine runs, so with the processor registered for the application's client, the server span of OpenTelemetry's Ktor instrumentation and every span started inside the call carry the ids:
+
+```kotlin
+install(PostHog) { /* … */ }
+val tracing = OpenTelemetrySdk.builder()
+    .setTracerProvider(
+        SdkTracerProvider.builder()
+            .apply { posthog.sdk?.let { addSpanProcessor(PostHogContextSpanProcessor(it)) } }
+            .addSpanProcessor(BatchSpanProcessor.builder(OtlpHttpSpanExporter.getDefault()).build())
+            .build(),
+    ).build()
+install(KtorServerTelemetry) { setOpenTelemetry(tracing) }
+```
+
+Outside a call, `application.posthog.withContext { }` binds the context to the client, which the processor needs.
 
 ## Development
 

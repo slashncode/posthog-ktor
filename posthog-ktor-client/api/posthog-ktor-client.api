@@ -1,0 +1,8 @@
+public final class io/github/slashncode/posthog/ktor/client/PostHogTracingHeadersConfig {
+	public final fun getHosts ()Ljava/util/Set;
+}
+
+public final class io/github/slashncode/posthog/ktor/client/PostHogTracingHeadersKt {
+	public static final fun getPostHogTracingHeaders ()Lio/ktor/client/plugins/api/ClientPlugin;
+}
+

@@ -23,4 +23,8 @@ dependencies {
     testImplementation(libs.kotest.assertions.core)
     testImplementation(libs.kotlinx.serialization.json)
     testImplementation(libs.logback.classic)
+    testImplementation(platform(libs.opentelemetry.bom))
+    testImplementation(libs.opentelemetry.sdk)
+    testImplementation(libs.opentelemetry.sdk.testing)
+    testImplementation(libs.opentelemetry.ktor)
 }
