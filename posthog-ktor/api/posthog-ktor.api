@@ -2,15 +2,28 @@ public final class io/github/slashncode/posthog/ktor/CallLoggingKt {
 	public static final fun posthogContext (Lio/ktor/server/plugins/calllogging/CallLoggingConfig;)V
 }
 
+public final class io/github/slashncode/posthog/ktor/PostHogBootstrap {
+	public final fun getDistinctId ()Ljava/lang/String;
+	public final fun getFeatureFlagPayloads ()Ljava/util/Map;
+	public final fun getFeatureFlags ()Ljava/util/Map;
+	public final fun isIdentified ()Z
+	public final fun toJson ()Ljava/lang/String;
+}
+
 public final class io/github/slashncode/posthog/ktor/PostHogCall {
+	public final fun bootstrap (Ljava/util/Collection;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun bootstrap$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/util/Collection;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun capture (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
 	public static synthetic fun capture$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun captureException (Ljava/lang/Throwable;Ljava/util/Map;)V
 	public static synthetic fun captureException$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/Throwable;Ljava/util/Map;ILjava/lang/Object;)V
+	public final fun flags (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getDistinctId ()Ljava/lang/String;
+	public final fun getFeatureFlag (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getSessionId ()Ljava/lang/String;
 	public final fun identify (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)V
 	public static synthetic fun identify$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)V
+	public final fun isFeatureEnabled (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogCallKt {
@@ -52,10 +65,26 @@ public final class io/github/slashncode/posthog/ktor/PostHogContextKt {
 	public static final field MDC_SESSION_ID Ljava/lang/String;
 }
 
+public final class io/github/slashncode/posthog/ktor/PostHogFlags {
+	public final fun getDistinctId ()Ljava/lang/String;
+	public final fun getEvaluations ()Lcom/posthog/server/PostHogFeatureFlagEvaluations;
+	public final fun getFlag (Ljava/lang/String;)Ljava/lang/Object;
+	public final fun getFlagPayload (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getKeys ()Ljava/util/List;
+	public final fun isEnabled (Ljava/lang/String;)Z
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogFlagsKt {
+	public static final fun getFlagPayloadAs (Lio/github/slashncode/posthog/ktor/PostHogFlags;Ljava/lang/String;Lkotlinx/serialization/DeserializationStrategy;Lkotlinx/serialization/json/Json;)Ljava/lang/Object;
+	public static synthetic fun getFlagPayloadAs$default (Lio/github/slashncode/posthog/ktor/PostHogFlags;Ljava/lang/String;Lkotlinx/serialization/DeserializationStrategy;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
 public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
 	public final fun captureStatus (Lkotlin/jvm/functions/Function1;)V
 	public final fun exceptionFilter (Lkotlin/jvm/functions/Function2;)V
 	public final fun extraProperties (Lkotlin/jvm/functions/Function1;)V
+	public final fun flagContext (Lkotlin/jvm/functions/Function2;)V
+	public final fun getAttachAccessedFlags ()Z
 	public final fun getCaptureExceptions ()Z
 	public final fun getCaptureIp ()Z
 	public final fun getCaptureWithoutDistinctId ()Z
@@ -70,6 +99,7 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
 	public final fun requestFilter (Lkotlin/jvm/functions/Function1;)V
 	public final fun resolveDistinctId (Lkotlin/jvm/functions/Function1;)V
 	public final fun sdk (Lkotlin/jvm/functions/Function1;)V
+	public final fun setAttachAccessedFlags (Z)V
 	public final fun setCaptureExceptions (Z)V
 	public final fun setCaptureIp (Z)V
 	public final fun setCaptureWithoutDistinctId (Z)V
@@ -87,5 +117,12 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginKt {
 	public static final field SESSION_ID_HEADER Ljava/lang/String;
 	public static final fun getPostHog ()Lio/ktor/server/application/ApplicationPlugin;
 	public static final fun getPosthog (Lio/ktor/server/application/Application;)Lio/github/slashncode/posthog/ktor/PostHogClient;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogRoutesKt {
+	public static final fun featureFlag (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;)Lio/ktor/server/routing/Route;
+	public static synthetic fun featureFlag$default (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/ktor/server/routing/Route;
+	public static final fun posthogFlags (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/util/Collection;)Lio/ktor/server/routing/Route;
+	public static synthetic fun posthogFlags$default (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/util/Collection;ILjava/lang/Object;)Lio/ktor/server/routing/Route;
 }
 

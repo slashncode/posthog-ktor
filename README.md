@@ -14,8 +14,8 @@ PostHog has integrations for Django, Rails, Laravel, ASP.NET Core, Express and N
 | **Request context** | The browser's distinct id and session id (tracing headers `X-PostHog-Distinct-Id`, `X-PostHog-Session-Id`) or the user from Ktor's authentication, kept in the coroutine context across suspensions and threads, and handed to the SDK so its own calls see it; request properties (`$current_url`, `$request_method`, `$request_path`, `$route`, `$user_agent`, `$ip`) on every event | ✓ |
 | **Error tracking** | Exceptions of failed calls to PostHog error tracking, by the status the call ends with (5xx by default, whether StatusPages answered or not), with an exclusion list and a filter | ✓ |
 | **Logs** | The PostHog ids in the MDC of every log line of a call, CallLogging's request line included, for PostHog Logs | ✓ |
-| **Feature flags** | One evaluation per request, payloads decoded with kotlinx.serialization, routes gated by a flag (`featureFlag("new-checkout") { … }`), flags attached to the request's events | |
-| **Single-page apps** | A route that hands the browser its flags before the first render, without counting an exposure, to bootstrap posthog-js | |
+| **Feature flags** | One evaluation per request, payloads decoded with kotlinx.serialization, routes gated by a flag (`featureFlag("new-checkout") { … }`), the flags a request read attached to its events | ✓ |
+| **Bootstrapping posthog-js** | A route that hands a single-page app its flags before the first render, and the same for server-rendered pages, without counting an exposure | ✓ |
 | **Reverse proxy** | `/ingest` forwarded to PostHog, so ad blockers do not drop events | |
 | **Traces** | The PostHog ids on the OpenTelemetry server span | |
 | **Beyond the request** | The context for background jobs and message consumers; a Ktor `HttpClient` plugin passing it on to other services | |
@@ -53,6 +53,38 @@ fun Application.module() {
 
 Events captured during a call carry the call's distinct id, session id and request properties, also from other threads (`withContext(Dispatchers.IO)`), from `application.posthog` and from direct calls of the official SDK (`application.posthog.sdk`). Exceptions that end a call with a 5xx go to error tracking.
 
+### Feature flags
+
+```kotlin
+routing {
+    // Exists only while the flag is on for the caller (404 otherwise, or onDisabled).
+    featureFlag("new-checkout") {
+        post("/checkout") { /* … */ }
+    }
+
+    get("/wheel") {
+        val flags = call.posthog.flags() // evaluated once per call, on first use
+        val odds = flags.getFlagPayloadAs<Odds>("spin-wheel-odds") // a @Serializable class; no exposure
+        if (flags.getFlag("spin-wheel-odds") == "generous") { /* … */ } // records the exposure
+        call.posthog.capture("wheel_spun") // carries $feature/spin-wheel-odds
+    }
+
+    // posthog-js' bootstrap for a single-page app: values and payloads of these flags, no exposure.
+    posthogFlags("/api/flags", listOf("checkout-copy", "deal-countdown"))
+}
+```
+
+The single-page app fetches the bootstrap before its first render and starts with it, so experiments show their variant without flicker; posthog-js records the exposure when the page reads the flag. A same-origin request carries posthog-js' cookie (`ph_<projectToken>_posthog`), which names a returning visitor; a first visit gets no flags and posthog-js asks PostHog itself:
+
+```ts
+const bootstrap = await fetch('/api/flags').then(r => r.json())
+posthog.init('phc_…', { api_host: '/ingest', bootstrap })
+```
+
+A server-rendered page embeds `call.posthog.bootstrap(listOf("checkout-copy")).toJson()` in its `posthog.init` script (escaped for `<script>`); with `mintDistinctId = true` a first-time visitor gets a new anonymous id that posthog-js goes on with.
+
+Flags are evaluated for the call's distinct id; without one (no consent, no tracing headers) every flag is off and PostHog is not asked. With a `secretKey` they are evaluated locally, without a request per call.
+
 | Option | Default | |
 |---|---|---|
 | `projectToken`, `host`, `secretKey` | –, US cloud, – | `secretKey` (Feature Flags Secure API Key or personal API key) turns on local flag evaluation |
@@ -63,6 +95,8 @@ Events captured during a call carry the call's distinct id, session id and reque
 | `requestFilter`, `extraProperties`, `propertiesMap` | – | Skip calls (health checks), add properties, change or drop request properties |
 | `captureExceptions`, `captureStatus`, `excludedExceptions`, `exceptionFilter` | `true`, 5xx, client errors and gone clients, – | What a failed call reports |
 | `logContext` | `true` | `posthogDistinctId` and `sessionId` in the MDC |
+| `flagContext { call -> }` | – | Person properties, groups and group properties for flag evaluation (`PostHogEvaluateFlagsOptions.Builder`) |
+| `attachAccessedFlags` | `true` | Events of a call carry the flags it read (`$feature/<key>`, `$active_feature_flags`) |
 | `sdk { }` | – | Every other option of `posthog-server` |
 
 ## Development

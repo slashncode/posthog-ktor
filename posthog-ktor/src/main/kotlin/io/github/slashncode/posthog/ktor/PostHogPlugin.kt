@@ -1,5 +1,6 @@
 package io.github.slashncode.posthog.ktor
 
+import com.posthog.server.PostHogEvaluateFlagsOptions
 import com.posthog.server.PostHogInterface
 import com.posthog.server.PostHogRequestContext
 import io.ktor.http.HttpStatusCode
@@ -86,6 +87,13 @@ public class PostHogPluginConfig internal constructor(
     public var captureExceptions: Boolean = config.boolean("captureExceptions") ?: true
 
     /**
+     * Whether events captured in a call (exceptions included) carry the flags the call has read
+     * through `call.posthog.flags()`: `$feature/<key>` and `$active_feature_flags`, so breakdowns by
+     * variant work for server events too. Flags are never evaluated just for this.
+     */
+    public var attachAccessedFlags: Boolean = config.boolean("attachAccessedFlags") ?: true
+
+    /**
      * The exceptions never reported, with their subclasses: requests the client got wrong (bad
      * request, not found, content it cannot send or receive, too large) and clients that went away.
      * Add your own, or clear it.
@@ -99,6 +107,7 @@ public class PostHogPluginConfig internal constructor(
     internal var propertiesMap: (Map<String, Any>) -> Map<String, Any> = { it }
     internal var exceptionFilter: (Throwable, ApplicationCall) -> Boolean = { _, _ -> true }
     internal var captureStatus: (HttpStatusCode) -> Boolean = { it.value >= HttpStatusCode.InternalServerError.value }
+    internal var flagContext: PostHogEvaluateFlagsOptions.Builder.(ApplicationCall) -> Unit = {}
 
     /** Every other option of the official SDK (batching, proxy, flag polling…), applied last. */
     public fun sdk(configure: PostHogSdkConfig.Builder.() -> Unit) {
@@ -139,6 +148,21 @@ public class PostHogPluginConfig internal constructor(
         captureStatus = predicate
     }
 
+    /**
+     * What a call's flags are evaluated with besides its distinct id: person properties, groups and
+     * group properties that release conditions test, or the flags to evaluate (`flagKeys`) and
+     * `onlyEvaluateLocally`. Called once per evaluation, with the call:
+     *
+     * ```kotlin
+     * flagContext { call ->
+     *     call.principal<Customer>()?.let { personProperty("plan", it.plan); group("company", it.companyId) }
+     * }
+     * ```
+     */
+    public fun flagContext(configure: PostHogEvaluateFlagsOptions.Builder.(ApplicationCall) -> Unit) {
+        flagContext = configure
+    }
+
     private companion object {
         val defaultExcludedExceptions: Set<KClass<out Throwable>> =
             setOf(
@@ -171,6 +195,8 @@ private val clientKey = AttributeKey<PostHogClient>("PostHogClient")
  *   SDK calls.
  * - Puts the ids into the MDC of the call's log lines, for PostHog Logs.
  * - Reports the exceptions of failed calls to error tracking.
+ * - Evaluates a call's feature flags once, on first use (`call.posthog.flags()`), for gating
+ *   routes ([featureFlag]) and for posthog-js' bootstrap ([posthogFlags], `call.posthog.bootstrap`).
  *
  * ```kotlin
  * install(PostHog) {

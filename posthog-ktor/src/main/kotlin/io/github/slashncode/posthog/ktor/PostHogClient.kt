@@ -1,6 +1,7 @@
 package io.github.slashncode.posthog.ktor
 
 import com.posthog.server.PostHogCaptureOptions
+import com.posthog.server.PostHogFeatureFlagEvaluations
 import com.posthog.server.PostHogInterface
 import com.posthog.server.PostHogRequestContext
 
@@ -27,7 +28,7 @@ public class PostHogClient internal constructor(
         properties: Map<String, Any?> = emptyMap(),
         distinctId: String? = null,
     ) {
-        capture(event, properties, distinctId, emptyMap())
+        capture(event, properties, distinctId, emptyMap()) { null }
     }
 
     internal fun capture(
@@ -35,13 +36,13 @@ public class PostHogClient internal constructor(
         properties: Map<String, Any?>,
         distinctId: String?,
         contextProperties: Map<String, Any>,
+        flagsFor: (String?) -> PostHogFeatureFlagEvaluations?,
     ) {
         val client = sdk ?: return
         val id = distinctId ?: contextDistinctId()
         if (id == null && !captureWithoutDistinctId) return
-        val options = PostHogCaptureOptions.builder()
-        (contextProperties + properties.withoutNulls()).forEach { (key, value) -> options.property(key, value) }
-        if (id == null) client.capture(event, options.build()) else client.capture(id, event, options.build())
+        val options = options(contextProperties + properties.withoutNulls(), flagsFor(id))
+        if (id == null) client.capture(event, options) else client.capture(id, event, options)
     }
 
     /** Sets person properties of [distinctId] (`$set`, and `$set_once` for [propertiesSetOnce]). */
@@ -77,7 +78,7 @@ public class PostHogClient internal constructor(
         properties: Map<String, Any?> = emptyMap(),
         distinctId: String? = null,
     ) {
-        captureException(error, properties, distinctId, emptyMap())
+        captureException(error, properties, distinctId, emptyMap()) { null }
     }
 
     internal fun captureException(
@@ -85,17 +86,28 @@ public class PostHogClient internal constructor(
         properties: Map<String, Any?>,
         distinctId: String?,
         contextProperties: Map<String, Any>,
+        flagsFor: (String?) -> PostHogFeatureFlagEvaluations?,
     ) {
         val client = sdk ?: return
         val id = distinctId ?: contextDistinctId()
-        val merged = contextProperties + properties.withoutNulls()
-        if (id == null) client.captureException(error, merged) else client.captureException(error, id, merged)
+        val options = options(contextProperties + properties.withoutNulls(), flagsFor(id))
+        if (id == null) client.captureException(error, options) else client.captureException(error, id, options)
     }
 
     /** Sends what is queued now instead of with the next batch. */
     public fun flush() {
         sdk?.flush()
     }
+
+    private fun options(
+        properties: Map<String, Any>,
+        flags: PostHogFeatureFlagEvaluations?,
+    ): PostHogCaptureOptions =
+        PostHogCaptureOptions
+            .builder()
+            .properties(properties)
+            .apply { if (flags != null) flags(flags) }
+            .build()
 
     private fun contextDistinctId(): String? = PostHogRequestContext.current()?.distinctId?.takeIf { it.isNotBlank() }
 }

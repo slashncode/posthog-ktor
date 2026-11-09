@@ -8,6 +8,8 @@ dependencies {
     api(platform(libs.ktor.bom))
     api(libs.ktor.server.core)
     api(libs.posthog.server)
+    // Flag payloads decode with it; the bootstrap is written with it.
+    api(libs.kotlinx.serialization.json)
     // Only for CallLoggingConfig.posthogContext(); apps without CallLogging never load it.
     compileOnly(libs.ktor.server.call.logging)
 
