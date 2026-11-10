@@ -10,7 +10,7 @@ posthog-ktor brings PostHog to [Ktor](https://ktor.io) servers. Use it to captur
 It builds on PostHog's official JVM SDK, [`com.posthog:posthog-server`](https://posthog.com/docs/libraries/java), which handles batching, retries and local flag evaluation. posthog-ktor adds what Ktor needs. Each request gets a context that follows its coroutine across suspensions and threads. Every event, flag evaluation, exception, log line and span of the request then belongs to the same person and session as the browser that sent it.
 
 <Aside type="caution" title="Pre-release">
-  posthog-ktor is in development and not on Maven Central yet. Releases stay below 1.0 while the API may still change and the library is being tried in real applications; testers and feedback are welcome. It is an independent open-source project, not an official PostHog library.
+  posthog-ktor is a pre-release. Releases stay below 1.0 while the API may still change and the library is being tried in real applications; testers and feedback are welcome. It is an independent open-source project, not an official PostHog library.
 </Aside>
 
 <Aside>
@@ -32,19 +32,19 @@ Add the plugin to your server module's dependencies. Optional modules add more:
   <TabItem label="build.gradle.kts">
     ```kotlin
     dependencies {
-        implementation("io.github.slashncode:posthog-ktor:<version>")
+        implementation("io.github.slashncode:posthog-ktor:0.1.0")
         // Optional
-        implementation("io.github.slashncode:posthog-ktor-client:<version>")
-        implementation("io.github.slashncode:posthog-ktor-opentelemetry:<version>")
-        implementation("io.github.slashncode:posthog-ktor-langchain4j:<version>")
-        testImplementation("io.github.slashncode:posthog-ktor-test:<version>")
+        implementation("io.github.slashncode:posthog-ktor-client:0.1.0")
+        implementation("io.github.slashncode:posthog-ktor-opentelemetry:0.1.0")
+        implementation("io.github.slashncode:posthog-ktor-langchain4j:0.1.0")
+        testImplementation("io.github.slashncode:posthog-ktor-test:0.1.0")
     }
     ```
   </TabItem>
   <TabItem label="libs.versions.toml">
     ```toml
     [versions]
-    posthog-ktor = "<version>"
+    posthog-ktor = "0.1.0"
 
     [libraries]
     posthog-ktor = { module = "io.github.slashncode:posthog-ktor", version.ref = "posthog-ktor" }

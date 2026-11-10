@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 — 2026-11-10
+
+The first pre-release on Maven Central: `posthog-ktor`, `posthog-ktor-client`, `posthog-ktor-opentelemetry`, `posthog-ktor-langchain4j` and `posthog-ktor-test`.
+
 
 - `install(PostHog)`: a client of PostHog's JVM SDK for the application's lifetime, configured in code or in the `posthog` section of the application config, off without a project token, flushed and closed when the application stops.
 - `application.posthog`: capture, identify, alias, group, capture exceptions; the SDK's client for everything else.
