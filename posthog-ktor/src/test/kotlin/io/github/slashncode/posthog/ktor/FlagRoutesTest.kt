@@ -32,9 +32,9 @@ import kotlin.time.Duration.Companion.seconds
 private val flags =
     mapOf(
         "new-checkout" to Flag(true),
-        "checkout-copy" to Flag("calm", """{"button":"Nichts bestellen"}"""),
-        "coach-placement" to Flag(false),
-        "deal-countdown" to Flag("until"),
+        "checkout-button" to Flag("buy-now", """{"label":"Buy now"}"""),
+        "product-reviews" to Flag(false),
+        "banner-style" to Flag("compact"),
     )
 
 private val basicAuth = "Basic " + Base64.getEncoder().encodeToString("ada:secret".toByteArray())
@@ -63,10 +63,10 @@ class FlagRoutesTest :
                                 call.respondText("new")
                             }
                         }
-                        featureFlag("coach-placement") { get("/coach") { call.respondText("coach") } }
-                        featureFlag("checkout-copy", variant = "calm") { get("/copy/calm") { call.respondText("calm") } }
-                        featureFlag("checkout-copy", variant = "loud", onDisabled = { it.respondRedirect("/copy/calm") }) {
-                            get("/copy/loud") { call.respondText("loud") }
+                        featureFlag("product-reviews") { get("/reviews") { call.respondText("reviews") } }
+                        featureFlag("checkout-button", variant = "buy-now") { get("/button/buy-now") { call.respondText("buy-now") } }
+                        featureFlag("checkout-button", variant = "add-to-basket", onDisabled = { it.respondRedirect("/button/buy-now") }) {
+                            get("/button/add-to-basket") { call.respondText("add-to-basket") }
                         }
                         authenticate("basic") {
                             featureFlag("new-checkout") { get("/account/checkout") { call.respondText(call.posthog.distinctId!!) } }
@@ -81,9 +81,9 @@ class FlagRoutesTest :
                     fake.flagRequests.size shouldBe 0
 
                     get("/checkout").bodyAsText() shouldBe "new"
-                    get("/coach").status shouldBe HttpStatusCode.NotFound
-                    get("/copy/calm").bodyAsText() shouldBe "calm"
-                    get("/copy/loud").headers[HttpHeaders.Location] shouldBe "/copy/calm"
+                    get("/reviews").status shouldBe HttpStatusCode.NotFound
+                    get("/button/buy-now").bodyAsText() shouldBe "buy-now"
+                    get("/button/add-to-basket").headers[HttpHeaders.Location] shouldBe "/button/buy-now"
                     get("/account/checkout").status shouldBe HttpStatusCode.Unauthorized
                     client
                         .get("/account/checkout") {
@@ -98,8 +98,8 @@ class FlagRoutesTest :
                 fake.exposures() shouldContainAll
                     listOf(
                         Triple("anon-1", "new-checkout", "true"),
-                        Triple("anon-1", "coach-placement", "false"),
-                        Triple("anon-1", "checkout-copy", "calm"),
+                        Triple("anon-1", "product-reviews", "false"),
+                        Triple("anon-1", "checkout-button", "buy-now"),
                         Triple("ada", "new-checkout", "true"),
                     )
                 fake.assertCaptured("checkout_viewed").json.property("\$route") shouldBe "/checkout"
@@ -111,15 +111,15 @@ class FlagRoutesTest :
                 fake.remoteFlags = flags
                 postHogTest(fake, {
                     install(PostHog)
-                    routing { posthogFlags("/flags", listOf("new-checkout", "checkout-copy", "coach-placement", "unknown")) }
+                    routing { posthogFlags("/flags", listOf("new-checkout", "checkout-button", "product-reviews", "unknown")) }
                 }) {
                     val response = client.get("/flags") { header(DISTINCT_ID_HEADER, "anon-1") }
                     response.headers[HttpHeaders.CacheControl] shouldBe "no-store"
                     Json.parseToJsonElement(response.bodyAsText()) shouldBe
                         Json.parseToJsonElement(
                             """
-                            {"featureFlags":{"new-checkout":true,"checkout-copy":"calm"},
-                             "featureFlagPayloads":{"checkout-copy":{"button":"Nichts bestellen"}}}
+                            {"featureFlags":{"new-checkout":true,"checkout-button":"buy-now"},
+                             "featureFlagPayloads":{"checkout-button":{"label":"Buy now"}}}
                             """,
                         )
 

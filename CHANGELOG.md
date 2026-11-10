@@ -17,5 +17,29 @@
 - `posthogProxy(path, apiHost, assetsHost)`: a reverse proxy to PostHog for posthog-js (`api_host: '/ingest'`), streaming both ways, scripts from the cloud's assets host, cookies and `Authorization` dropped, `Set-Cookie` not returned, the visitor's address in `X-Forwarded-For`; 502/504 when PostHog cannot be reached in time. Built on the JDK's HTTP client: no new dependency.
 - New module `posthog-ktor-test`: `PostHogFake`, a local fake PostHog for the real client (`applicationConfig()` points the plugin at it), with scripted flags, local flag definitions, `assertCaptured(event) { property(…) }`, `assertNotCaptured`, `CapturedEvent.flags`. The library's own tests run on it.
 - Options `flushAt` and `flushIntervalSeconds`, also from the `posthog` config section.
-- `samples/shop`: a sample app with posthog-js through the proxy, bootstrapped from the server, a flag-gated route and tests on `PostHogFake`.
-- API reference on GitHub Pages (Dokka, all modules, sources linked).
+- `samples/shop`: a one-page general store with posthog-js through the proxy, bootstrapped from the server, a flag-gated route and tests on `PostHogFake`.
+- The API of PostHog's own SDKs (Node, posthog-js, KMP), as far as it fits a server:
+  - `beforeSend { event -> }` hooks on every event the SDK sends (`$exception`, `$feature_flag_called`, `$identify` included), chained; sampling hooks `sampleByEvent`, `sampleByDistinctId`, `sampleBySessionId`.
+  - Super properties: `application.posthog.register`, `registerOnce`, `unregister`, `superProperties`.
+  - Person properties: `setPersonProperties` and `unsetPersonProperties` on `call.posthog` and `application.posthog`; `call.posthog.alias`.
+  - Person profiles: `personProfiles = ALWAYS | IDENTIFIED_ONLY | NEVER` (posthog-js' `person_profiles`); events without a profile carry `$process_person_profile: false`.
+  - Groups: `call.posthog.group(type, key, properties)` puts the rest of the call in a group (events, exceptions, flags); `capture(groups = …)`; `withContext(groups = …)`; `application.posthog.groupIdentify` replaces `application.posthog.group`.
+  - `capture(timestamp = …)`, `capturePageview`, `captureFeatureView` and `captureFeatureInteraction` (enriched flag analytics).
+  - Opting out: the `optOut` option, `optOut()`, `optIn()`, `isOptedOut`; nothing is sent and flags are off meanwhile.
+  - GeoIP: events without `$ip` (outside calls) carry `$geoip_disable`, flags are evaluated without GeoIP, `disableGeoip` for everything.
+  - Flags: `getFeatureFlagResult` / `PostHogFlags.getFlagResult` (`PostHogFlagResult` with `getPayloadAs<T>()`), `application.posthog.evaluateFlags` for work outside calls and `capture(flags = …)`, `setPersonPropertiesForFlags`, `setGroupPropertiesForFlags` and their resets (the call's flags are evaluated again), identify's properties used for the call's flags, `reloadFeatureFlags()`.
+  - `withContext` contexts nest like posthog-node's: they inherit what they do not set; `fresh = true` starts from nothing.
+  - Options `debug` (and `debug()` at runtime), `maxQueueSize`, `maxBatchSize`, `sendFeatureFlagEvent`, `localEvaluation`, `pollIntervalSeconds`, `evaluationContexts`, `inAppIncludes`, `captureUncaughtExceptions`, `releaseIdentifier`, `customBlockedUserAgents`, also from the `posthog` config section; `POSTHOG_EU_HOST`.
+  - `CapturedEvent.groups` in `posthog-ktor-test`.
+- `getAllFeatureFlags` (call and application): every flag with value and payload, without an exposure.
+- `shutdownTimeoutMs`: stopping waits for queued events at most this long (30 s), then stops anyway.
+- Surveys answered outside posthog-js: `captureSurveyShown`, `captureSurveySent`, `captureSurveyDismissed` (`$survey_response_<id>`, `$survey_responded/<id>`).
+- Early access features: `getEarlyAccessFeatures(stages)` for an opt-in page, `updateEarlyAccessFeatureEnrollment` (call and application).
+- `call.posthog.sessionReplayUrl` and `application.posthog.sessionReplayUrl(sessionId)`; option `uiHost`; `projectToken`, `host`, `uiHost` and `privacyMode` readable on the client.
+- AI observability: `call.posthog.ai` / `application.posthog.ai` with `captureGeneration`, `captureEmbedding`, `captureSpan`, `captureTrace` (PostHog's `$ai_*` properties), `trace { }` and `span { }` blocks that share a trace id and set parents, `PostHogAiContext`, `PostHogAiMessage`; option `privacyMode`.
+- `PostHogContext.currentThread()` for callbacks that cannot suspend.
+- New module `posthog-ktor-langchain4j`: `PostHogChatModelListener` captures every LangChain4j chat model call as a generation of the call's person, inside the surrounding AI trace.
+- New module `posthog-ktor-opentelemetry`: `install(PostHogOpenTelemetry)` sends traces (`/i/v1/traces`), Logback logs (`/i/v1/logs`) and AI spans (`/i/v0/ai/otel`) to PostHog without a collector, with the call's person and session; Ktor server instrumentation, `Tracer.withSpan`, `HttpClientConfig.posthogOpenTelemetry`, `beforeSpanSend`; `PostHogAiSpanProcessor` and `PostHogAiSpanExporter` (tested with a Koog agent) for OpenTelemetry SDKs built elsewhere.
+- `posthog-ktor-test`: `PostHogFake` receives OTLP (`spans`, `aiSpans`, `logs`, `assertSpan`, `assertAiSpan`, `assertLog`) and answers early access features (`earlyAccessFeature`).
+- posthog-server 2.24.1.
+- Documentation on GitHub Pages: a guide in the chapters of PostHog's library docs (installation, capturing events, identifying users, feature flags, experiments, error tracking, logs, traces, background work, proxy, testing, all options, FAQ), with the API reference (Dokka, all modules, sources linked) under `/api/`.

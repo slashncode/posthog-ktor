@@ -34,6 +34,16 @@ public class PostHogFlags internal constructor(
     /** The payload of the flag's current value as JSON text, if it has one; records no exposure. */
     public fun getFlagPayload(key: String): String? = evaluations?.getFlagPayload(key)
 
+    /**
+     * The flag's value and payload in one: whether it is on, its variant, its payload; null if it
+     * was not evaluated. Records an exposure, as reading its value does.
+     */
+    public fun getFlagResult(key: String): PostHogFlagResult? {
+        if (key !in keys) return null
+        val value = getFlag(key) ?: return null
+        return PostHogFlagResult(key, enabled = value != false, variant = value as? String, payload = getFlagPayload(key))
+    }
+
     internal fun accessed(): PostHogFeatureFlagEvaluations? = evaluations?.onlyAccessed()?.takeIf { it.keys.isNotEmpty() }
 
     internal companion object {
@@ -44,7 +54,7 @@ public class PostHogFlags internal constructor(
 
 /**
  * The payload of the flag's current value decoded with kotlinx.serialization, e.g. a
- * `@Serializable data class Odds(val weights: List<Int>)`; null if there is none or it does not
+ * `@Serializable data class Recommendations(val limit: Int)`; null if there is none or it does not
  * decode (logged as a warning: a payload edited in PostHog should not fail a request). Records no
  * exposure.
  */
@@ -58,8 +68,41 @@ public fun <T> PostHogFlags.getFlagPayloadAs(
     key: String,
     deserializer: DeserializationStrategy<T>,
     json: Json = Json,
+): T? = decodePayload(key, getFlagPayload(key), deserializer, json)
+
+/** A flag's evaluation: [PostHogFlags.getFlagResult], posthog-js' and the mobile SDKs' `getFeatureFlagResult`. */
+public class PostHogFlagResult internal constructor(
+    /** The flag's key. */
+    public val key: String,
+    /** Whether the flag is on (any variant counts). */
+    public val enabled: Boolean,
+    /** The variant of a multivariate flag; null for a boolean flag, or a flag that is off. */
+    public val variant: String?,
+    /** The payload of the flag's current value as JSON text, if it has one. */
+    public val payload: String?,
+) {
+    /** The variant if there is one, else [enabled]. */
+    public val value: Any get() = variant ?: enabled
+
+    override fun toString(): String = "PostHogFlagResult(key=$key, enabled=$enabled, variant=$variant, payload=$payload)"
+}
+
+/** The [PostHogFlagResult.payload] decoded with kotlinx.serialization; null if there is none or it does not decode (logged). */
+public inline fun <reified T> PostHogFlagResult.getPayloadAs(json: Json = Json): T? = getPayloadAs(serializer<T>(), json)
+
+/** The [PostHogFlagResult.payload] decoded with [deserializer]; see the reified overload. */
+public fun <T> PostHogFlagResult.getPayloadAs(
+    deserializer: DeserializationStrategy<T>,
+    json: Json = Json,
+): T? = decodePayload(key, payload, deserializer, json)
+
+private fun <T> decodePayload(
+    key: String,
+    payload: String?,
+    deserializer: DeserializationStrategy<T>,
+    json: Json,
 ): T? {
-    val payload = getFlagPayload(key) ?: return null
+    payload ?: return null
     return try {
         json.decodeFromString(deserializer, payload)
     } catch (e: IllegalArgumentException) {

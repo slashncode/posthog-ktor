@@ -80,7 +80,7 @@ class PostHogCallTest :
                             post("/orders/{id}") {
                                 call.posthog.capture("as_user")
                                 call.posthog.capture("explicit", distinctId = "someone-else")
-                                call.posthog.identify("ada-renamed", properties = mapOf("plan" to "nothing"))
+                                call.posthog.identify("ada-renamed", properties = mapOf("plan" to "pro"))
                                 call.posthog.capture("after_identify")
                                 call.respondText("ok")
                             }

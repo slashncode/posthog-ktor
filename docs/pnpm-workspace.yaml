@@ -1,0 +1,9 @@
+# pnpm settings for the docs site (no workspace packages). pnpm writes some of these itself.
+
+# Install scripts stay off: esbuild and sharp ship prebuilt binaries through optional dependencies.
+allowBuilds:
+  esbuild: false
+  sharp: false
+
+shellEmulator: true
+trustPolicy: no-downgrade

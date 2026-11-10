@@ -1,0 +1,71 @@
+public final class io/github/slashncode/posthog/ktor/opentelemetry/PostHogAiSpanExporter : io/opentelemetry/sdk/trace/export/SpanExporter {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun export (Ljava/util/Collection;)Lio/opentelemetry/sdk/common/CompletableResultCode;
+	public fun flush ()Lio/opentelemetry/sdk/common/CompletableResultCode;
+	public fun shutdown ()Lio/opentelemetry/sdk/common/CompletableResultCode;
+}
+
+public final class io/github/slashncode/posthog/ktor/opentelemetry/PostHogAiSpanProcessor : io/opentelemetry/sdk/trace/SpanProcessor {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/time/Duration;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ZLjava/time/Duration;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun forceFlush ()Lio/opentelemetry/sdk/common/CompletableResultCode;
+	public fun isEndRequired ()Z
+	public fun isStartRequired ()Z
+	public fun onEnd (Lio/opentelemetry/sdk/trace/ReadableSpan;)V
+	public fun onStart (Lio/opentelemetry/context/Context;Lio/opentelemetry/sdk/trace/ReadWriteSpan;)V
+	public fun shutdown ()Lio/opentelemetry/sdk/common/CompletableResultCode;
+}
+
+public final class io/github/slashncode/posthog/ktor/opentelemetry/PostHogAiSpanProcessorKt {
+	public static final fun aiSpanExporter (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/Boolean;)Lio/github/slashncode/posthog/ktor/opentelemetry/PostHogAiSpanExporter;
+	public static synthetic fun aiSpanExporter$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/Boolean;ILjava/lang/Object;)Lio/github/slashncode/posthog/ktor/opentelemetry/PostHogAiSpanExporter;
+	public static final fun aiSpanProcessor (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/Boolean;Ljava/time/Duration;)Lio/github/slashncode/posthog/ktor/opentelemetry/PostHogAiSpanProcessor;
+	public static synthetic fun aiSpanProcessor$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/Boolean;Ljava/time/Duration;ILjava/lang/Object;)Lio/github/slashncode/posthog/ktor/opentelemetry/PostHogAiSpanProcessor;
+}
+
+public final class io/github/slashncode/posthog/ktor/opentelemetry/PostHogOpenTelemetryConfig {
+	public final fun beforeSpanSend (Lkotlin/jvm/functions/Function1;)V
+	public final fun getAi ()Z
+	public final fun getEnvironment ()Ljava/lang/String;
+	public final fun getFlushIntervalMs ()J
+	public final fun getInstrumentServer ()Z
+	public final fun getLogs ()Z
+	public final fun getMaxExportBatchSize ()I
+	public final fun getMaxQueueSize ()I
+	public final fun getPrivacyMode ()Ljava/lang/Boolean;
+	public final fun getResourceAttributes ()Ljava/util/Map;
+	public final fun getSampler ()Lio/opentelemetry/sdk/trace/samplers/Sampler;
+	public final fun getServiceName ()Ljava/lang/String;
+	public final fun getServiceVersion ()Ljava/lang/String;
+	public final fun getShutdownTimeoutMs ()J
+	public final fun getTraces ()Z
+	public final fun loggerProvider (Lkotlin/jvm/functions/Function1;)V
+	public final fun setAi (Z)V
+	public final fun setEnvironment (Ljava/lang/String;)V
+	public final fun setFlushIntervalMs (J)V
+	public final fun setInstrumentServer (Z)V
+	public final fun setLogs (Z)V
+	public final fun setMaxExportBatchSize (I)V
+	public final fun setMaxQueueSize (I)V
+	public final fun setPrivacyMode (Ljava/lang/Boolean;)V
+	public final fun setSampler (Lio/opentelemetry/sdk/trace/samplers/Sampler;)V
+	public final fun setServiceName (Ljava/lang/String;)V
+	public final fun setServiceVersion (Ljava/lang/String;)V
+	public final fun setShutdownTimeoutMs (J)V
+	public final fun setTraces (Z)V
+	public final fun tracerProvider (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class io/github/slashncode/posthog/ktor/opentelemetry/PostHogOpenTelemetryKt {
+	public static final fun getOpenTelemetry (Lio/ktor/server/application/Application;)Lio/opentelemetry/api/OpenTelemetry;
+	public static final fun getPostHogOpenTelemetry ()Lio/ktor/server/application/ApplicationPlugin;
+	public static final fun getPosthogTracer (Lio/ktor/server/application/Application;)Lio/opentelemetry/api/trace/Tracer;
+}
+
+public final class io/github/slashncode/posthog/ktor/opentelemetry/SpansKt {
+	public static final fun posthogOpenTelemetry (Lio/ktor/client/HttpClientConfig;Lio/opentelemetry/api/OpenTelemetry;)V
+	public static final fun withSpan (Lio/opentelemetry/api/trace/Tracer;Ljava/lang/String;Lio/opentelemetry/api/trace/SpanKind;Lio/opentelemetry/api/common/Attributes;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun withSpan$default (Lio/opentelemetry/api/trace/Tracer;Ljava/lang/String;Lio/opentelemetry/api/trace/SpanKind;Lio/opentelemetry/api/common/Attributes;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+

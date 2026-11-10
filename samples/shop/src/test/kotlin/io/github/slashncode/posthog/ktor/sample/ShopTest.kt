@@ -16,18 +16,18 @@ class ShopTest :
     FunSpec({
         test("a first visit gets a minted id, the server-rendered variant and posthog-js bootstrapped with it") {
             PostHogFake().use { posthog ->
-                posthog.flag(CHECKOUT_COPY, "calm")
+                posthog.flag(CHECKOUT_BUTTON, "buy-now")
                 testApplication {
                     environment { config = posthog.applicationConfig() }
                     application { module() }
 
                     val page = client.get("/").bodyAsText()
-                    page shouldContain "Order nothing, calmly"
+                    page shouldContain "Buy now"
                     page shouldContain "api_host: '/ingest'"
-                    page shouldContain """"featureFlags":{"checkout-copy":"calm"}"""
+                    page shouldContain """"featureFlags":{"checkout-button":"buy-now"}"""
                     page shouldContain """"isIdentifiedID":false"""
 
-                    val exposure = posthog.assertCaptured("\$feature_flag_called") { property("\$feature_flag", CHECKOUT_COPY) }
+                    val exposure = posthog.assertCaptured("\$feature_flag_called") { property("\$feature_flag", CHECKOUT_BUTTON) }
                     page shouldContain """"distinctID":"${exposure.distinctId}""""
                 }
             }

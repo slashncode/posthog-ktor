@@ -25,24 +25,24 @@ class PostHogFakeTest :
         test("an app under test sends to the fake; assertions wait for what it captured") {
             PostHogFake().use { posthog ->
                 posthog.flag("new-checkout", true)
-                posthog.flag("checkout-copy", "calm", """{"button":"Nichts bestellen"}""")
+                posthog.flag("checkout-button", "buy-now", """{"label":"Buy now"}""")
                 testApplication {
                     environment { config = posthog.applicationConfig() }
                     application {
                         install(PostHog)
                         routing {
                             post("/checkout") {
-                                val copy = call.posthog.getFeatureFlag("checkout-copy")
+                                val button = call.posthog.getFeatureFlag("checkout-button")
                                 call.posthog.capture(
                                     "order_placed",
                                     mapOf("total" to 12.0, "items" to 2, "express" to false, "currency" to "EUR", "coupon" to null),
                                 )
-                                call.respondText("$copy")
+                                call.respondText("$button")
                             }
                         }
                     }
 
-                    client.post("/checkout") { header(DISTINCT_ID_HEADER, "anon-1") }.bodyAsText() shouldBe "calm"
+                    client.post("/checkout") { header(DISTINCT_ID_HEADER, "anon-1") }.bodyAsText() shouldBe "buy-now"
 
                     // Still inside the application: sent one by one, no need to stop it first.
                     val order =
@@ -54,9 +54,9 @@ class PostHogFakeTest :
                             property("coupon", null)
                         }
                     order.distinctId shouldBe "anon-1"
-                    order.flags shouldBe mapOf("checkout-copy" to "calm")
+                    order.flags shouldBe mapOf("checkout-button" to "buy-now")
                     order.property("\$request_path") shouldBe "/checkout"
-                    posthog.assertCaptured("\$feature_flag_called") { property("\$feature_flag", "checkout-copy") }
+                    posthog.assertCaptured("\$feature_flag_called") { property("\$feature_flag", "checkout-button") }
                     posthog.flagRequests.single()["distinct_id"].toString() shouldBe "\"anon-1\""
                     posthog.assertNotCaptured("order_cancelled", within = 100.milliseconds)
                 }
@@ -97,12 +97,12 @@ class PostHogFakeTest :
 
         test("its configuration goes on top of the app's own") {
             PostHogFake().use { posthog ->
-                val base = MapApplicationConfig("posthog.host" to "https://eu.i.posthog.com", "shop.name" to "NothingEats")
+                val base = MapApplicationConfig("posthog.host" to "https://eu.i.posthog.com", "shop.name" to "General Store")
                 val config = posthog.applicationConfig(base)
                 config.property("posthog.host").getString() shouldBe posthog.host
                 config.property("posthog.projectToken").getString() shouldBe posthog.projectToken
-                config.property("shop.name").getString() shouldBe "NothingEats"
+                config.property("shop.name").getString() shouldBe "General Store"
             }
-            shouldThrow<IllegalArgumentException> { PostHogFake().use { it.flag("odds", 3) } }
+            shouldThrow<IllegalArgumentException> { PostHogFake().use { it.flag("max-items", 3) } }
         }
     })

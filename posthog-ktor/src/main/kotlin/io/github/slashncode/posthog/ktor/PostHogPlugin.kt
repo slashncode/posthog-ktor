@@ -1,8 +1,11 @@
 package io.github.slashncode.posthog.ktor
 
+import com.posthog.PersonProfiles
+import com.posthog.PostHogEvent
 import com.posthog.server.PostHogEvaluateFlagsOptions
 import com.posthog.server.PostHogInterface
 import com.posthog.server.PostHogRequestContext
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
@@ -21,8 +24,11 @@ import kotlin.reflect.KClass
 import com.posthog.server.PostHog as PostHogSdk
 import com.posthog.server.PostHogConfig as PostHogSdkConfig
 
-/** PostHog's US cloud, the official SDKs' default. The EU cloud is `https://eu.i.posthog.com`. */
+/** PostHog's US cloud, the official SDKs' default. */
 public const val POSTHOG_US_HOST: String = "https://us.i.posthog.com"
+
+/** PostHog's EU cloud. */
+public const val POSTHOG_EU_HOST: String = "https://eu.i.posthog.com"
 
 /**
  * Configuration of the [PostHog] plugin. Values come from the `posthog` section of the application
@@ -49,6 +55,26 @@ public class PostHogPluginConfig internal constructor(
     public var host: String = config.string("host") ?: POSTHOG_US_HOST
 
     /**
+     * PostHog's app, for links such as session replay URLs, as posthog-js' `ui_host`. For PostHog's
+     * clouds it follows from [host] (`https://eu.i.posthog.com` → `https://eu.posthog.com`); set it
+     * for a self-hosted PostHog whose app lives elsewhere.
+     */
+    public var uiHost: String? = config.string("uiHost")
+
+    /**
+     * How long stopping the application waits for queued events to be sent, in milliseconds, as
+     * posthog-node's `shutdown(timeout)`. Past it the application stops anyway; an unreachable
+     * PostHog never holds up a deployment.
+     */
+    public var shutdownTimeoutMs: Long = config.long("shutdownTimeoutMs") ?: 30_000
+
+    /**
+     * AI observability without content, as posthog-node's `privacyMode`: AI events carry no
+     * prompts, outputs or input and output state; models, tokens, latency and costs still go.
+     */
+    public var privacyMode: Boolean = config.boolean("privacyMode") ?: false
+
+    /**
      * A key that may read the project's flag definitions: the Feature Flags Secure API Key (`phs_…`)
      * or a personal API key with `feature_flag:read`. With it, flags are evaluated locally,
      * without a request to PostHog per evaluation.
@@ -61,9 +87,78 @@ public class PostHogPluginConfig internal constructor(
     /** How often queued events are sent at the latest, in seconds; the SDK's default if null. */
     public var flushIntervalSeconds: Int? = config.int("flushIntervalSeconds")
 
+    /** How many events are queued at most; the oldest are dropped beyond it. The SDK's default (10,000) if null. */
+    public var maxQueueSize: Int? = config.int("maxQueueSize")
+
+    /** How many events are sent in one request at most; the SDK's default (100) if null. */
+    public var maxBatchSize: Int? = config.int("maxBatchSize")
+
+    /** The official SDK's verbose logging: what is sent, how flags are evaluated. */
+    public var debug: Boolean = config.boolean("debug") ?: false
+
+    /**
+     * Whether PostHog starts opted out: nothing is captured and every flag is off until
+     * `application.posthog.optIn()`.
+     */
+    public var optOut: Boolean = config.boolean("optOut") ?: false
+
+    /**
+     * Which events create and update person profiles, as posthog-js' `person_profiles`:
+     * [PersonProfiles.ALWAYS] (the default, as the official server SDKs do), [PersonProfiles.IDENTIFIED_ONLY]
+     * (events of a call only for a known user: `resolveDistinctId`, `identify`, an explicit distinct
+     * id, or after `setPersonProperties`, `group` or `alias` in the call; a browser's anonymous id
+     * from the tracing header gets none) or [PersonProfiles.NEVER]. Events without a person profile
+     * carry `$process_person_profile: false`. In the config: `personProfiles = identified_only`.
+     */
+    public var personProfiles: PersonProfiles = config.personProfiles("personProfiles") ?: PersonProfiles.ALWAYS
+
+    /**
+     * Whether PostHog skips GeoIP for every event (`$geoip_disable`). Events that carry no `$ip`
+     * (captured outside a call, or with [captureIp] off) skip it anyway: PostHog would otherwise
+     * locate the person at the server's address. Flags are evaluated without GeoIP too; give
+     * location properties to `flagContext` instead.
+     */
+    public var disableGeoip: Boolean = config.boolean("disableGeoip") ?: false
+
+    /** Whether reading a flag's value records an exposure (`$feature_flag_called`). */
+    public var sendFeatureFlagEvent: Boolean = config.boolean("sendFeatureFlagEvent") ?: true
+
+    /**
+     * Whether a [secretKey] turns on local evaluation (polling the flag definitions). Off, flags are
+     * evaluated by PostHog even with a key.
+     */
+    public var localEvaluation: Boolean = config.boolean("localEvaluation") ?: true
+
+    /** How often the flag definitions are reloaded for local evaluation, in seconds; the SDK's default (30) if null. */
+    public var pollIntervalSeconds: Int? = config.int("pollIntervalSeconds")
+
+    /**
+     * Evaluation context tags: only flags tagged with one of them are evaluated (an environment,
+     * an app). In the config a list or comma-separated.
+     */
+    public val evaluationContexts: MutableList<String> = config.list("evaluationContexts").toMutableList()
+
+    /** Package prefixes of in-app stack frames in error tracking, e.g. `com.example`. */
+    public val inAppIncludes: MutableList<String> = config.list("inAppIncludes").toMutableList()
+
+    /** Whether exceptions that end a thread (outside calls) are reported too. */
+    public var captureUncaughtExceptions: Boolean = config.boolean("captureUncaughtExceptions") ?: false
+
+    /** The release (version) exceptions are reported with, for error tracking. */
+    public var releaseIdentifier: String? = config.string("releaseIdentifier")
+
+    /**
+     * Calls whose `User-Agent` contains one of these (ignoring case) capture nothing, as posthog-js'
+     * `custom_blocked_useragents`: bots, uptime checks. `call.posthog` does nothing in them and their
+     * exceptions are not reported.
+     */
+    public val customBlockedUserAgents: MutableList<String> = config.list("customBlockedUserAgents").toMutableList()
+
     /**
      * A client created elsewhere, used instead of one built from this configuration. The plugin
-     * does not close it; whoever created it does.
+     * does not close it; whoever created it does. The options that shape every event the SDK sends
+     * ([beforeSend], [disableGeoip], [PersonProfiles.NEVER], super properties, opting out) need the
+     * plugin's own client; with this one they apply to what posthog-ktor captures only.
      */
     public var client: PostHogInterface? = null
 
@@ -114,6 +209,23 @@ public class PostHogPluginConfig internal constructor(
     internal var exceptionFilter: (Throwable, ApplicationCall) -> Boolean = { _, _ -> true }
     internal var captureStatus: (HttpStatusCode) -> Boolean = { it.value >= HttpStatusCode.InternalServerError.value }
     internal var flagContext: PostHogEvaluateFlagsOptions.Builder.(ApplicationCall) -> Unit = {}
+    internal val beforeSendHooks = mutableListOf<(PostHogEvent) -> PostHogEvent?>()
+
+    /**
+     * Changes or drops every event before it is sent, posthog-js' `before_send`: return the event
+     * (changed or not), or null to drop it. Hooks run in the order added, each with the previous
+     * one's result; a hook that throws drops the event. They see every event the SDK sends
+     * (`$exception`, `$feature_flag_called`, `$identify` included), with the context's and the
+     * super properties merged in.
+     *
+     * ```kotlin
+     * beforeSend { event -> event.apply { properties?.remove("email") } }
+     * beforeSend(sampleByEvent(setOf("search_performed"), 0.1))
+     * ```
+     */
+    public fun beforeSend(hook: (PostHogEvent) -> PostHogEvent?) {
+        beforeSendHooks += hook
+    }
 
     /** Every other option of the official SDK (batching, proxy, flag polling…), applied last. */
     public fun sdk(configure: PostHogSdkConfig.Builder.() -> Unit) {
@@ -186,10 +298,35 @@ public class PostHogPluginConfig internal constructor(
         fun ApplicationConfig.boolean(key: String) = propertyOrNull(key)?.getString()?.toBooleanStrictOrNull()
 
         fun ApplicationConfig.int(key: String) = propertyOrNull(key)?.getString()?.toIntOrNull()
+
+        fun ApplicationConfig.long(key: String) = propertyOrNull(key)?.getString()?.toLongOrNull()
+
+        // A list, or a comma-separated string (an environment variable).
+        fun ApplicationConfig.list(key: String): List<String> {
+            val property = propertyOrNull(key) ?: return emptyList()
+            val values =
+                try {
+                    property.getList()
+                } catch (_: Exception) {
+                    property.getString().split(',')
+                }
+            return values.flatMap { it.split(',') }.map { it.trim() }.filter { it.isNotEmpty() }
+        }
+
+        fun ApplicationConfig.personProfiles(key: String): PersonProfiles? =
+            string(key)?.let { value ->
+                PersonProfiles.entries.firstOrNull { it.name.equals(value.replace('-', '_'), ignoreCase = true) }
+                    ?: throw IllegalArgumentException(
+                        "posthog.$key is '$value'; expected one of ${PersonProfiles.entries.joinToString { it.name.lowercase() }}",
+                    )
+            }
     }
 }
 
 private val clientKey = AttributeKey<PostHogClient>("PostHogClient")
+
+/** Marks a call from a blocked user agent: nothing is captured for it. */
+internal val blockedKey = AttributeKey<Unit>("PostHogBlockedUserAgent")
 
 /**
  * The PostHog plugin for Ktor servers.
@@ -218,11 +355,13 @@ public val PostHog: ApplicationPlugin<PostHogPluginConfig> =
     createApplicationPlugin("PostHog", "posthog", ::PostHogPluginConfig) {
         val config = pluginConfig
         val owned = config.client == null
-        val sdk = config.client ?: config.buildClient()
-        val client = PostHogClient(sdk, config.captureWithoutDistinctId, config.host)
+        val client = PostHogClient(config)
+        val sdk = config.client ?: config.buildClient(client)
+        client.sdk = sdk
+        sdk?.takeIf { config.debug }?.debug(true)
         application.attributes.put(clientKey, client)
         if (owned && sdk != null) {
-            application.monitor.subscribe(ApplicationStopped) { sdk.close() }
+            application.monitor.subscribe(ApplicationStopped) { sdk.closeWithin(config.shutdownTimeoutMs) }
         }
 
         // The route template is known once routing has picked a route.
@@ -231,6 +370,10 @@ public val PostHog: ApplicationPlugin<PostHogPluginConfig> =
         }
 
         on(CallScope) { call, proceed ->
+            if (config.isBlockedUserAgent(call)) {
+                call.attributes.put(blockedKey, Unit)
+                return@on proceed()
+            }
             if (!config.requestFilter(call)) return@on proceed()
             val state = PostHogCallState(call, config, client)
             call.attributes.put(PostHogCallState.key, state)
@@ -307,14 +450,45 @@ private object CallScope : Hook<suspend (ApplicationCall, suspend () -> Unit) ->
     }
 }
 
-private fun PostHogPluginConfig.buildClient(): PostHogInterface? {
+// close() flushes and may retry against an unreachable PostHog; the application stops regardless.
+private fun PostHogInterface.closeWithin(timeoutMs: Long) {
+    val closing = Thread({ close() }, "posthog-shutdown").apply { isDaemon = true }
+    closing.start()
+    closing.join(timeoutMs.coerceAtLeast(1))
+    if (closing.isAlive) {
+        LoggerFactory
+            .getLogger(
+                PostHog::class.java,
+            ).warn("PostHog did not finish sending within {} ms; stopping without waiting", timeoutMs)
+    }
+}
+
+private fun PostHogPluginConfig.isBlockedUserAgent(call: ApplicationCall): Boolean {
+    if (customBlockedUserAgents.isEmpty()) return false
+    val userAgent = call.request.headers[HttpHeaders.UserAgent] ?: return false
+    return customBlockedUserAgents.any { userAgent.contains(it, ignoreCase = true) }
+}
+
+private fun PostHogPluginConfig.buildClient(client: PostHogClient): PostHogInterface? {
     val token = projectToken ?: return null
     val builder = PostHogSdkConfig.builder(token).host(host)
-    secretKey?.let { builder.personalApiKey(it).localEvaluation(true) }
+    secretKey?.let { builder.personalApiKey(it).localEvaluation(localEvaluation) }
     flushAt?.let { builder.flushAt(it) }
     flushIntervalSeconds?.let { builder.flushIntervalSeconds(it) }
-    builder.sdk()
-    return PostHogSdk.with(builder.build())
+    maxQueueSize?.let { builder.maxQueueSize(it) }
+    maxBatchSize?.let { builder.maxBatchSize(it) }
+    pollIntervalSeconds?.let { builder.pollIntervalSeconds(it) }
+    releaseIdentifier?.let { builder.releaseIdentifier(it) }
+    if (evaluationContexts.isNotEmpty()) builder.evaluationContexts(evaluationContexts.toList())
+    if (inAppIncludes.isNotEmpty()) builder.inAppIncludes(inAppIncludes.toList())
+    builder
+        .debug(debug)
+        .sendFeatureFlagEvent(sendFeatureFlagEvent)
+        .captureUncaughtExceptions(captureUncaughtExceptions)
+        .sdk()
+    val sdkConfig = builder.build()
+    sdkConfig.addBeforeSend(EventPipeline(client, beforeSendHooks.toList(), personProfiles, disableGeoip))
+    return PostHogSdk.with(sdkConfig)
 }
 
 /** The PostHog client of this application; installing the [PostHog] plugin creates it. */

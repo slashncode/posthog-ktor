@@ -1,0 +1,8 @@
+public final class io/github/slashncode/posthog/ktor/langchain4j/PostHogChatModelListener : dev/langchain4j/model/chat/listener/ChatModelListener {
+	public fun <init> (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/util/Map;)V
+	public synthetic fun <init> (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun onError (Ldev/langchain4j/model/chat/listener/ChatModelErrorContext;)V
+	public fun onRequest (Ldev/langchain4j/model/chat/listener/ChatModelRequestContext;)V
+	public fun onResponse (Ldev/langchain4j/model/chat/listener/ChatModelResponseContext;)V
+}
+

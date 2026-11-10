@@ -26,8 +26,8 @@ import io.ktor.server.routing.get
  * featureFlag("new-checkout") {
  *     post("/checkout") { … }
  * }
- * featureFlag("checkout-copy", variant = "calm", onDisabled = { it.respondRedirect("/checkout") }) {
- *     get("/checkout/calm") { … }
+ * featureFlag("checkout-button", variant = "buy-now", onDisabled = { it.respondRedirect("/checkout") }) {
+ *     get("/checkout/buy-now") { … }
  * }
  * ```
  */

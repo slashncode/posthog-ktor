@@ -22,7 +22,7 @@ private class DishMissing : RuntimeException("no such dish")
 
 private fun Application.failingRoutes() {
     routing {
-        get("/boom/{id}") { error("kaputt") }
+        get("/boom/{id}") { error("broken") }
         get("/missing") { throw DishMissing() }
         get("/bad") { throw BadRequestException("no") }
         get("/flush") {
@@ -93,7 +93,7 @@ class ExceptionCaptureTest :
                     install(PostHog) {
                         captureStatus { it.value >= 400 }
                         excludedExceptions.clear()
-                        exceptionFilter { cause, _ -> cause.message != "kaputt" }
+                        exceptionFilter { cause, _ -> cause.message != "broken" }
                     }
                     failingRoutes()
                 }) {

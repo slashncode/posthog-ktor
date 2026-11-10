@@ -22,4 +22,6 @@ rootProject.name = "posthog-ktor-root"
 include(":posthog-ktor")
 include(":posthog-ktor-client")
 include(":posthog-ktor-test")
+include(":posthog-ktor-opentelemetry")
+include(":posthog-ktor-langchain4j")
 include(":samples:shop")

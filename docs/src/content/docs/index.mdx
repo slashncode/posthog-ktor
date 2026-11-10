@@ -1,0 +1,1190 @@
+---
+title: Ktor
+description: PostHog for Ktor servers. Capture events, identify users, evaluate feature flags, run experiments and track errors, with every event tied to the request, person and session it belongs to.
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components'
+
+posthog-ktor brings PostHog to [Ktor](https://ktor.io) servers. Use it to capture events, identify users, evaluate feature flags, run experiments and report errors from your server code.
+
+It builds on PostHog's official JVM SDK, [`com.posthog:posthog-server`](https://posthog.com/docs/libraries/java), which handles batching, retries and local flag evaluation. posthog-ktor adds what Ktor needs. Each request gets a context that follows its coroutine across suspensions and threads. Every event, flag evaluation, exception, log line and span of the request then belongs to the same person and session as the browser that sent it.
+
+<Aside type="caution" title="Pre-release">
+  posthog-ktor is in development and not on Maven Central yet. Its API may change before 1.0. It is an independent open-source project, not an official PostHog library.
+</Aside>
+
+<Aside>
+  The examples use PostHog's US cloud. If your project is on the EU cloud, use `https://eu.i.posthog.com` as the host.
+</Aside>
+
+## Installation
+
+Add the plugin to your server module's dependencies. Optional modules add more:
+
+| Module | What it adds |
+|---|---|
+| `posthog-ktor-client` | Passes the PostHog ids on to services you call with Ktor's `HttpClient` |
+| `posthog-ktor-opentelemetry` | [Traces, logs and AI spans](#opentelemetry) to PostHog over OpenTelemetry, without a collector |
+| `posthog-ktor-langchain4j` | [LangChain4j](#langchain4j) chat model calls as AI generations |
+| `posthog-ktor-test` | A fake PostHog server for your tests |
+
+<Tabs syncKey="gradle">
+  <TabItem label="build.gradle.kts">
+    ```kotlin
+    dependencies {
+        implementation("io.github.slashncode:posthog-ktor:<version>")
+        // Optional
+        implementation("io.github.slashncode:posthog-ktor-client:<version>")
+        implementation("io.github.slashncode:posthog-ktor-opentelemetry:<version>")
+        implementation("io.github.slashncode:posthog-ktor-langchain4j:<version>")
+        testImplementation("io.github.slashncode:posthog-ktor-test:<version>")
+    }
+    ```
+  </TabItem>
+  <TabItem label="libs.versions.toml">
+    ```toml
+    [versions]
+    posthog-ktor = "<version>"
+
+    [libraries]
+    posthog-ktor = { module = "io.github.slashncode:posthog-ktor", version.ref = "posthog-ktor" }
+    posthog-ktor-client = { module = "io.github.slashncode:posthog-ktor-client", version.ref = "posthog-ktor" }
+    posthog-ktor-test = { module = "io.github.slashncode:posthog-ktor-test", version.ref = "posthog-ktor" }
+    ```
+
+    ```kotlin
+    dependencies {
+        implementation(libs.posthog.ktor)
+        implementation(libs.posthog.ktor.client)
+        testImplementation(libs.posthog.ktor.test)
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+posthog-ktor requires Java 17 or later and Ktor 3. It brings `posthog-server` with it.
+
+### Configure the plugin
+
+Install the plugin once in your application module. Pass your project token and the host of your project's region. Both are in your [project settings](https://app.posthog.com/project/settings). `POSTHOG_US_HOST` and `POSTHOG_EU_HOST` hold the hosts of PostHog's two clouds.
+
+```kotlin
+fun Application.module() {
+    install(PostHog) {
+        projectToken = "<ph_project_token>"
+        host = "https://us.i.posthog.com"
+    }
+}
+```
+
+You can also configure the plugin in the `posthog` section of your application config, so the token comes from the environment. Values from the config are read first, and the `install(PostHog) { }` block can override them.
+
+```text title="application.conf"
+posthog {
+    projectToken = ${?POSTHOG_PROJECT_TOKEN}
+    host = "https://us.i.posthog.com"
+}
+```
+
+The same keys work in `application.yaml`. Every option with a config key is listed in [All configuration options](#all-configuration-options).
+
+```kotlin
+fun Application.module() {
+    install(PostHog)
+}
+```
+
+<Aside title="No project token, no traffic">
+  Without a project token, PostHog stays off. Nothing is sent, every flag is off and every call is a no-op. Local development and tests that do not set a token need no extra setup.
+</Aside>
+
+When the application stops, the plugin flushes the queued events and closes its client.
+
+### Use an existing client
+
+If your application already creates a `posthog-server` client, pass it to the plugin. The plugin uses it instead of building its own and does not close it. The options that shape every event the SDK sends (`beforeSend`, `disableGeoip`, `personProfiles = NEVER`, super properties and opting out) then apply only to what posthog-ktor captures, not to the SDK's own events.
+
+```kotlin
+install(PostHog) {
+    client = existingPostHogClient
+}
+```
+
+### Link server events to the browser
+
+Server events belong to the same person and session as the browser when the browser sends its ids with each request. posthog-js sends them in the tracing headers `X-PostHog-Distinct-Id` and `X-PostHog-Session-Id` to the hosts you list in its `tracing_headers` option. See [Link session replay](https://posthog.com/docs/ai-observability/link-session-replay) in PostHog's docs.
+
+```js
+posthog.init('<ph_project_token>', {
+    api_host: 'https://us.i.posthog.com',
+    tracing_headers: ['api.example.com'],
+})
+```
+
+If your app calls its API on the same origin, or builds its own requests, set the headers yourself from `posthog.get_distinct_id()` and `posthog.get_session_id()`.
+
+<Aside type="caution">
+  The browser controls these headers. Treat the ids as analytics context, never as authentication or authorization.
+</Aside>
+
+When a user is signed in, tell the plugin who they are with `resolveDistinctId`. That id wins over the header. See [Identifying users](#identifying-users).
+
+## Capturing events
+
+Capture an event during a call with `call.posthog.capture`:
+
+```kotlin
+post("/orders") {
+    // …
+    call.posthog.capture("order_placed")
+}
+```
+
+Add properties as a map. Properties with a `null` value are left out.
+
+```kotlin
+call.posthog.capture(
+    "order_placed",
+    mapOf(
+        "total" to 12.5,
+        "items" to 2,
+        "coupon" to coupon?.code,
+    ),
+)
+```
+
+Every event captured during a call carries the call's distinct id and session id, and these request properties:
+
+| Property | Value |
+|---|---|
+| `$current_url` | The full URL of the request |
+| `$request_method` | The HTTP method |
+| `$request_path` | The path of the request |
+| `$route` | The route template that matched, such as `/orders/{id}` |
+| `$user_agent` | The `User-Agent` header |
+| `$ip` | The client's address, honouring Ktor's `ForwardedHeaders` and `XForwardedHeaders` plugins |
+| `$session_id` | The browser's session id, which links the event to its session replay |
+
+Outside a call handler, capture with `application.posthog`. It uses the context of the current coroutine, so inside a call it behaves like `call.posthog`, also after `withContext(Dispatchers.IO)` or on another thread. Pass a distinct id to capture for someone else.
+
+```kotlin
+application.posthog.capture("order_delivered", mapOf("minutes" to 34), distinctId = order.customerId)
+```
+
+The official SDK is available as `application.posthog.sdk` for everything posthog-ktor does not wrap. It is `null` while PostHog is off. Direct SDK calls made during a call see the call's distinct id, session id and request properties too.
+
+### Groups and timestamps
+
+`capture` also takes the [groups](#group-analytics) the event belongs to, added to the call's, and when it happened, if not now:
+
+```kotlin
+call.posthog.capture(
+    "order_imported",
+    mapOf("total" to 12.5),
+    groups = mapOf("company" to company.id),
+    timestamp = order.placedAt, // java.time.Instant
+)
+```
+
+### Capturing pageviews
+
+posthog-js captures the pageviews of the pages it runs on. For pages it does not see, such as responses to clients without JavaScript, capture a `$pageview` on the server. During a call, `$current_url` is the request's URL:
+
+```kotlin
+get("/feed.xml") {
+    call.posthog.capturePageview(mapOf("format" to "rss"))
+    // …
+}
+```
+
+Outside a call, pass the URL: `application.posthog.capturePageview("https://example.com/feed.xml", distinctId = readerId)`.
+
+## Filter events before sending
+
+Change or drop events before they are sent with `beforeSend`. Return the event, changed or not, or `null` to drop it. Hooks run in the order you add them, each with the previous one's result. A hook that throws drops the event.
+
+Hooks see every event the SDK sends, including `$exception`, `$feature_flag_called` and `$identify`, with the context's properties and the [super properties](#super-properties) already merged in.
+
+```kotlin
+install(PostHog) {
+    // Remove a property
+    beforeSend { event -> event.apply { properties?.remove("email") } }
+    // Drop an event
+    beforeSend { event -> if (event.event == "debug_ping") null else event }
+}
+```
+
+### Sampling events
+
+Three ready-made hooks keep a share of the events, between `0.0` and `1.0`:
+
+```kotlin
+install(PostHog) {
+    // 10 % of these events, chosen at random
+    beforeSend(sampleByEvent(setOf("search_performed"), 0.1))
+    // all events of 40 % of the persons
+    beforeSend(sampleByDistinctId(0.4))
+    // all events of 25 % of the sessions
+    beforeSend(sampleBySessionId(0.25))
+}
+```
+
+`sampleByDistinctId` and `sampleBySessionId` decide by the id, so a person or session is kept or dropped as a whole, on every server.
+
+### Leave calls alone
+
+Skip calls such as health checks with `requestFilter`. Calls it rejects get no context, no request properties and no exception capture.
+
+```kotlin
+install(PostHog) {
+    requestFilter { call -> !call.request.path().startsWith("/health") }
+}
+```
+
+Calls from user agents in `customBlockedUserAgents` capture nothing at all, like posthog-js' `custom_blocked_useragents`. The entries match any part of the `User-Agent` header, ignoring case.
+
+```kotlin
+install(PostHog) {
+    customBlockedUserAgents += listOf("UptimeRobot", "Pingdom")
+}
+```
+
+### Change request properties
+
+Change or remove request properties before they go out with `propertiesMap`. To stop sending the client's address, set `captureIp = false`.
+
+```kotlin
+install(PostHog) {
+    captureIp = false
+    propertiesMap { properties -> properties - "\$user_agent" }
+}
+```
+
+## Identifying users
+
+<Aside type="caution" title="Identify your users">
+  Identify users once they sign in. Server events then link to the same person as their browser events, session replays and errors.
+
+  Use the stable id of your auth system as the distinct id, not an email address or display name. Never use a shared value such as `"anonymous"` or `"user"`. If there is no id yet, do not identify: the call keeps the browser's anonymous id. See [Identifying users](https://posthog.com/docs/product-analytics/identify) in PostHog's docs.
+</Aside>
+
+Resolve the distinct id of the signed-in user from Ktor's authentication with `resolveDistinctId`. Keep the resolver cheap and free of I/O, because it can be called often. Return `null` when the call has no user.
+
+```kotlin
+install(Authentication) { /* … */ }
+install(PostHog) {
+    resolveDistinctId { call -> call.principal<UserIdPrincipal>()?.name }
+}
+```
+
+Right after a sign-in, the browser does not know the user yet. Call `call.posthog.identify` to use the user's id for the rest of the call, and to set person properties:
+
+```kotlin
+post("/login") {
+    val user = login(call.receive())
+    call.posthog.identify(
+        user.id,
+        properties = mapOf("plan" to user.plan),
+        propertiesSetOnce = mapOf("signed_up_at" to user.createdAt.toString()),
+    )
+    call.posthog.capture("user_logged_in")
+}
+```
+
+The properties passed to `identify` are also used for the call's flag evaluation, as posthog-js does. Linking the browser's anonymous id to the user is posthog-js' job: call `posthog.identify(userId)` in the browser after the sign-in.
+
+A call's distinct id is the first one found, in this order:
+
+1. A distinct id passed to `capture` or `captureException`
+2. The id set by `call.posthog.identify`
+3. The id from `resolveDistinctId`
+4. The browser's id from the `X-PostHog-Distinct-Id` header (`useTracingHeaders`)
+5. The id of a [server-rendered bootstrap](#bootstrap-posthog-js): posthog-js' cookie or a new anonymous id
+
+## Anonymous and identified events
+
+Events with a distinct id belong to that person. An event captured without any distinct id is sent the way the official SDK sends it: under a random id and without a person profile (`$process_person_profile: false`).
+
+If you only want events about known visitors, set `captureWithoutDistinctId = false`. Events without a distinct id are then dropped. If posthog-js sends its ids only after a visitor agrees to analytics, this setting captures nothing about visitors who did not agree.
+
+```kotlin
+install(PostHog) {
+    captureWithoutDistinctId = false
+}
+```
+
+### Person profiles
+
+Anonymous events cost less than identified ones. `personProfiles` decides which events create and update person profiles, like posthog-js' `person_profiles`:
+
+| Value | Events with a person profile |
+|---|---|
+| `ALWAYS` (default) | All events with a distinct id, as the official server SDKs send them |
+| `IDENTIFIED_ONLY` | Events of known users only: a call with `resolveDistinctId` or `identify`, an explicit distinct id, or a call that used `setPersonProperties`, `group` or `alias`. A browser's anonymous id from the tracing header gets no profile. |
+| `NEVER` | None |
+
+```kotlin
+install(PostHog) {
+    personProfiles = PersonProfiles.IDENTIFIED_ONLY
+}
+```
+
+Events without a person profile carry `$process_person_profile: false`. In the application config, write `personProfiles = identified_only`.
+
+## Get the current user's distinct ID
+
+```kotlin
+val distinctId = call.posthog.distinctId
+val sessionId = call.posthog.sessionId
+```
+
+Outside a call handler, read them from the coroutine's context:
+
+```kotlin
+val context = PostHogContext.current()
+val distinctId = context?.distinctId
+```
+
+## Alias
+
+Assign another distinct id to the same user with `alias`. Read about alias in PostHog's [identify docs](https://posthog.com/docs/product-analytics/identify) before using it.
+
+```kotlin
+// During a call: another id for the call's person
+call.posthog.alias(legacyUserId)
+
+// Anywhere
+application.posthog.alias(distinctId = user.id, alias = legacyUserId)
+```
+
+## Setting person properties
+
+Set person properties of the call's person with `setPersonProperties`. `propertiesSetOnce` sets a property only if the person does not have it yet. Remove properties with `unsetPersonProperties`.
+
+```kotlin
+call.posthog.setPersonProperties(
+    properties = mapOf("plan" to "pro"),
+    propertiesSetOnce = mapOf("first_plan" to "free"),
+)
+call.posthog.unsetPersonProperties(listOf("trial_ends_at"))
+```
+
+Outside a call, name the person, or let the context's distinct id decide:
+
+```kotlin
+application.posthog.setPersonProperties(mapOf("newsletter" to true), distinctId = user.id)
+```
+
+`identify` also sets person properties, with an `$identify` event. Person properties are attached to the person, not to events. For properties on events, use [super properties](#super-properties).
+
+## Super properties
+
+Super properties are sent with every event of the application, from the moment you register them until it stops. An event's own properties and its context's win over them.
+
+```kotlin
+application.posthog.register(mapOf("app_version" to "1.4.2", "region" to "eu-central"))
+application.posthog.registerOnce(mapOf("deployed_at" to startedAt)) // only if not registered yet
+application.posthog.unregister("region")
+```
+
+Add properties to every event of a call with `extraProperties`. Properties with a `null` value are left out.
+
+```kotlin
+install(PostHog) {
+    extraProperties { call ->
+        mapOf("tenant" to call.request.headers["X-Tenant"], "api_version" to "v2")
+    }
+}
+```
+
+For work outside a call, pass `properties` to [`withContext`](#background-jobs-and-message-consumers).
+
+## Feature flags
+
+A call evaluates its flags once, on first use, for the call's distinct id. Later reads in the same call use the same result. When something the evaluation depends on changes (the distinct id through `identify`, the call's groups, or the [properties set for flags](#overriding-server-properties)), the next read evaluates the flags again.
+
+```kotlin
+get("/checkout") {
+    if (call.posthog.isFeatureEnabled("new-checkout")) {
+        // …
+    }
+
+    when (call.posthog.getFeatureFlag("checkout-button")) {
+        "buy-now" -> { /* … */ }
+        else -> { /* … */ }
+    }
+}
+```
+
+`isFeatureEnabled` returns whether the flag is on for the caller. `getFeatureFlag` returns the variant of a multivariate flag, else `true` or `false`, or `null` if the flag was not evaluated.
+
+`getFeatureFlagResult` returns everything about a flag in one read: whether it is on, its variant and its payload.
+
+```kotlin
+val result = call.posthog.getFeatureFlagResult("checkout-button")
+if (result?.enabled == true) {
+    val variant = result.variant // "buy-now", or null for a boolean flag
+    val button = result.getPayloadAs<ButtonCopy>() // the payload, decoded
+}
+```
+
+`call.posthog.flags()` returns all flags of the call as `PostHogFlags`, with `isEnabled`, `getFlag`, `getFlagResult`, `getFlagPayload` and `keys`.
+
+Reading a flag's value records an exposure (`$feature_flag_called`), as the official SDK does. Reading its payload or its key does not. To record no exposures at all, set `sendFeatureFlagEvent = false`.
+
+<Aside>
+  Without a distinct id, every flag is off and PostHog is not asked. This happens when the browser sends no ids, for example before the visitor agreed to analytics, and when PostHog is off or opted out.
+</Aside>
+
+### Payloads
+
+`getFlagPayload` returns the payload of the flag's current value as JSON text. `getFlagPayloadAs` decodes it with kotlinx.serialization:
+
+```kotlin
+@Serializable
+data class Recommendations(val limit: Int, val strategy: String)
+
+get("/products") {
+    val recommendations = call.posthog.flags().getFlagPayloadAs<Recommendations>("recommendations")
+}
+```
+
+If the payload is missing or does not decode, `getFlagPayloadAs` returns `null` and logs a warning, so a payload edited in PostHog never fails a request.
+
+### Local evaluation
+
+By default, flags are evaluated by PostHog, and the SDK caches the result per distinct id for 5 minutes. With a `secretKey`, the SDK loads the flag definitions and evaluates flags locally, without a request to PostHog. Use the project's Feature Flags Secure API Key (`phs_…`) or a personal API key with `feature_flag:read`.
+
+```kotlin
+install(PostHog) {
+    projectToken = "<ph_project_token>"
+    secretKey = System.getenv("POSTHOG_FLAGS_SECURE_API_KEY")
+}
+```
+
+The definitions are reloaded every 30 seconds (`pollIntervalSeconds`). To load them again now, for example after a deployment changed a flag, call `application.posthog.reloadFeatureFlags()`. With `localEvaluation = false`, the key stays configured but PostHog evaluates the flags.
+
+To evaluate only the flags tagged for this service, list its [evaluation contexts](https://posthog.com/docs/feature-flags/evaluation-contexts):
+
+```kotlin
+install(PostHog) {
+    evaluationContexts += listOf("api", "production")
+}
+```
+
+See [Local evaluation](https://posthog.com/docs/feature-flags/local-evaluation) in PostHog's docs.
+
+### Overriding server properties
+
+Release conditions can test person properties, groups and group properties. PostHog uses the values it has stored. To evaluate with values PostHog does not have yet, provide them.
+
+For every call, use `flagContext`. The block runs once per evaluation, with the call:
+
+```kotlin
+install(PostHog) {
+    flagContext { call ->
+        call.principal<Customer>()?.let { customer ->
+            personProperty("plan", customer.plan)
+            group("company", customer.companyId)
+        }
+    }
+}
+```
+
+The block configures `PostHogEvaluateFlagsOptions.Builder` of the official SDK, so it can also limit which flags are evaluated (`flagKeys`) or evaluate only locally (`onlyEvaluateLocally`).
+
+During a call, set them where you know them. The next read evaluates the flags again:
+
+```kotlin
+call.posthog.setPersonPropertiesForFlags(mapOf("plan" to "pro"))
+call.posthog.setGroupPropertiesForFlags(mapOf("company" to mapOf("seats" to 50)))
+// and to forget them:
+call.posthog.resetPersonPropertiesForFlags()
+call.posthog.resetGroupPropertiesForFlags("company")
+```
+
+The properties passed to `identify` and `setPersonProperties`, and the groups of [`call.posthog.group`](#group-analytics), are used for the call's flags automatically, as in posthog-js.
+
+<Aside>
+  Flags are evaluated without GeoIP: the server's address says nothing about where the visitor is. To target by location, pass the visitor's location as person properties, such as `$geoip_country_code`.
+</Aside>
+
+### All flags without an exposure
+
+`getAllFeatureFlags` returns every flag of the person with its value and payload, like posthog-js' `getAllFeatureFlags`. It records no exposure, so use it to show or hand on flags, not to decide what a person sees.
+
+```kotlin
+val flags = call.posthog.getAllFeatureFlags() // Map<String, PostHogFlagResult>
+val all = application.posthog.getAllFeatureFlags(distinctId = user.id)
+```
+
+It reads each flag on its own with an exposure-free call of the official SDK. With [local evaluation](#local-evaluation) that costs nothing; otherwise the SDK's cache keeps the requests few.
+
+### Flags outside a call
+
+Consumers and jobs evaluate flags with `application.posthog.evaluateFlags`. It evaluates once for the context's person and groups, or for the distinct id you pass. Pass the result to `capture` to attach the flags you read to the event.
+
+```kotlin
+application.posthog.withContext(distinctId = order.customerId) {
+    val flags = application.posthog.evaluateFlags { personProperty("plan", order.plan) }
+    if (flags.isEnabled("express-delivery")) {
+        // …
+    }
+    application.posthog.capture("order_shipped", flags = flags)
+}
+```
+
+### Flags on events
+
+Events captured in a call, exceptions included, carry the flags the call has read: `$feature/<key>` and `$active_feature_flags`. Breakdowns by variant then work for server events too. Flags are never evaluated just for this. To turn it off, set `attachAccessedFlags = false`.
+
+### Enriched flag analytics
+
+PostHog's flag page shows how often a feature was seen and used. Record views and interactions for features the server renders, like posthog-js' `PostHogFeature` component does in the browser:
+
+```kotlin
+call.posthog.captureFeatureView("product-reviews")        // $feature_view
+call.posthog.captureFeatureInteraction("product-reviews") // $feature_interaction, and the person property $feature_interaction/product-reviews
+```
+
+### Gate routes behind a flag
+
+Routes inside `featureFlag` exist only for callers the flag is on for. Other callers get a `404 Not Found`, or whatever `onDisabled` answers. Add `variant` to gate on one variant of a multivariate flag.
+
+```kotlin
+routing {
+    featureFlag("new-checkout") {
+        post("/checkout") { /* … */ }
+    }
+
+    featureFlag("checkout-button", variant = "buy-now", onDisabled = { it.respondRedirect("/checkout") }) {
+        get("/checkout/buy-now") { /* … */ }
+    }
+}
+```
+
+The flag is read after authentication, so `resolveDistinctId` and `flagContext` see the principal. The exposure is recorded only for calls that reach the gated routes.
+
+### Bootstrap posthog-js
+
+posthog-js can start with flag values from your server, so experiments show the right variant on the first render, without flicker. posthog-ktor evaluates these flags without an exposure. posthog-js records the exposure when the page reads the flag.
+
+For a single-page app, add a route that answers the bootstrap for the caller. Name the flags it should contain.
+
+```kotlin
+routing {
+    posthogFlags("/api/flags", listOf("checkout-button", "banner-style"))
+}
+```
+
+```js
+const bootstrap = await fetch('/api/flags').then((response) => response.json())
+posthog.init('<ph_project_token>', { api_host: '/ingest', bootstrap })
+```
+
+The answer is never cached (`Cache-Control: no-store`). Its distinct id comes from the call: the signed-in user, the tracing header, or posthog-js' cookie `ph_<project_token>_posthog` on a same-origin request. Without one, the answer is empty and posthog-js asks PostHog itself.
+
+For a server-rendered page, build the bootstrap during the call and embed it in the page. `toJson()` is safe inside a `<script>` element.
+
+```kotlin
+get("/") {
+    val bootstrap = call.posthog.bootstrap(listOf("checkout-button"), mintDistinctId = true)
+    call.respondHtml {
+        head {
+            script {
+                unsafe { +"posthog.init('<ph_project_token>', { api_host: '/ingest', bootstrap: ${bootstrap.toJson()} })" }
+            }
+        }
+        body { /* … */ }
+    }
+}
+```
+
+With `mintDistinctId = true`, a first-time visitor gets a new anonymous id (a UUIDv7, like posthog-js' own). posthog-js goes on with it, and the rest of the call captures with it. Only mint an id for visitors who agreed to analytics.
+
+## Experiments (A/B tests)
+
+Experiments run on feature flags. Check the variant with `getFeatureFlag`:
+
+```kotlin
+if (call.posthog.getFeatureFlag("checkout-button") == "buy-now") {
+    // the "buy-now" variant
+} else {
+    // control
+}
+```
+
+Reading the variant records the exposure for the experiment. Events captured later in the call carry the variant, so experiment metrics on server events break down by variant. You can also give each variant its own routes with [`featureFlag`](#gate-routes-behind-a-flag). See [Experiments](https://posthog.com/docs/experiments) in PostHog's docs.
+
+## Group analytics
+
+Group analytics associates events with a group, such as a company or a team. It is a paid feature of PostHog.
+
+During a call, `call.posthog.group` puts the call in a group. Every later event of the call carries it (`$groups`), and the call's flags are evaluated with it. It also creates or updates the group with its properties. The `name` property is shown in PostHog's UI.
+
+```kotlin
+post("/reports") {
+    call.posthog.group("company", company.id, mapOf("name" to company.name, "plan" to company.plan))
+    // …
+    call.posthog.capture("report_exported") // carries $groups: {company: <id>}
+}
+```
+
+To put a single event in a group, pass `groups` to `capture`. For work outside a call, pass `groups` to [`withContext`](#background-jobs-and-message-consumers).
+
+```kotlin
+application.posthog.capture("invoice_sent", distinctId = user.id, groups = mapOf("company" to company.id))
+```
+
+Create or update a group without putting events in it with `groupIdentify`. Without a distinct id, the `$groupidentify` event is captured for the context's person, or for `<groupType>_<groupKey>` as in posthog-node.
+
+```kotlin
+application.posthog.groupIdentify("company", company.id, mapOf("name" to company.name))
+```
+
+## Error tracking
+
+Exceptions that end a call with a `5xx` status go to [error tracking](https://posthog.com/docs/error-tracking), with the call's distinct id, session id, request properties and flags. The status decides, whether `StatusPages` answered the call or nobody did. The plugin reports from a phase outside every other plugin, so the order of `install` calls does not matter.
+
+Exceptions about requests the client got wrong, and about clients that went away, are not reported:
+
+- `BadRequestException`, `NotFoundException`, `ContentTransformationException`, `PayloadTooLargeException`
+- `CancellationException`, `ChannelWriteException`, `ClosedWriteChannelException`
+
+Change what is reported with these options:
+
+```kotlin
+install(PostHog) {
+    captureStatus { status -> status.value >= 500 || status == HttpStatusCode.Conflict }
+    excludedExceptions += OrderNotFoundException::class // subclasses count too
+    exceptionFilter { error, call -> call.request.path() != "/legacy" }
+}
+```
+
+To stop reporting call failures, set `captureExceptions = false`.
+
+Report a handled exception yourself with `captureException`:
+
+```kotlin
+try {
+    paymentProvider.refund(order)
+} catch (e: PaymentException) {
+    call.posthog.captureException(e, mapOf("order_id" to order.id))
+}
+```
+
+Outside a call, use `application.posthog.captureException(e, properties, distinctId)`.
+
+Mark your own packages as in-app frames with `inAppIncludes`. Report exceptions that end threads outside calls with `captureUncaughtExceptions`. Name the release the exceptions belong to with `releaseIdentifier`.
+
+```kotlin
+install(PostHog) {
+    inAppIncludes += "com.example"
+    captureUncaughtExceptions = true
+    releaseIdentifier = "shop@1.4.2"
+}
+```
+
+## Logs
+
+Every log line written during a call carries the call's ids in the MDC: `posthogDistinctId` and `sessionId`. [PostHog Logs](https://posthog.com/docs/logs) links a log record to a person and a session replay by these attributes.
+
+Ktor's `CallLogging` writes its request line outside the call's coroutine. Add `posthogContext()` to give that line the ids too:
+
+```kotlin
+install(CallLogging) {
+    posthogContext()
+}
+```
+
+To ship the log lines to PostHog, install [`PostHogOpenTelemetry`](#opentelemetry), or send your JSON logs over OTLP with an OpenTelemetry Collector and keep the MDC keys as log attributes. To stop writing the ids into the MDC, set `logContext = false`.
+
+## OpenTelemetry
+
+`posthog-ktor-opentelemetry` sets up OpenTelemetry for PostHog in one `install`, without a collector:
+
+- **Traces** go to [PostHog's tracing](https://posthog.com/docs/distributed-tracing). Every span started during a call carries its `posthogDistinctId` and `sessionId`, so a trace links to the person and their session replay. Each call gets a server span from OpenTelemetry's Ktor instrumentation.
+- **Logs** written with Logback go to PostHog Logs, with the call's person, session and trace.
+- **AI spans** of model libraries that use OpenTelemetry (Koog, Spring AI) go to [AI observability](#ai-observability).
+
+```kotlin
+install(PostHog) {
+    projectToken = "<ph_project_token>"
+}
+install(PostHogOpenTelemetry) {
+    serviceName = "orders"
+    serviceVersion = "1.4.2"
+    environment = "production"
+}
+```
+
+Install `PostHog` first: the plugin sends to its project and host. Without a project token nothing is set up and `application.openTelemetry` is OpenTelemetry's no-op.
+
+### Spans of your own
+
+`withSpan` runs a block in a child of the current span, the call's server span or an outer `withSpan`, like posthog-node's `withSpan`. The span ends with the block. An exception is recorded, sets the status to error and is rethrown.
+
+```kotlin
+post("/orders") {
+    val order = call.receive<Order>()
+    application.posthogTracer.withSpan("charge card") { span ->
+        span.setAttribute("order.id", order.id)
+        payments.charge(order)
+    }
+}
+```
+
+Keep span names low-cardinality (`charge card`, not `charge card 4711`) and put values in attributes.
+
+### Tracing across services
+
+Trace the requests of an `HttpClient` with `posthogOpenTelemetry`. Each request gets a client span and carries the W3C `traceparent`, so the called service's spans join the trace. Add [`PostHogTracingHeaders`](#calling-other-services) to pass the person and session on too.
+
+```kotlin
+val orders = HttpClient(CIO) {
+    posthogOpenTelemetry(application.openTelemetry)
+    install(PostHogTracingHeaders) { hosts += "orders.internal" }
+}
+```
+
+### Change or drop spans
+
+`beforeSpanSend` changes or drops a span before it goes to PostHog's tracing, like posthog-node's hook. Return the span, wrapped in `DelegatingSpanData` to change it, or `null` to drop it.
+
+```kotlin
+install(PostHogOpenTelemetry) {
+    beforeSpanSend { span -> if (span.name == "GET /health") null else span }
+}
+```
+
+### OpenTelemetry options
+
+These options can also be set in the `posthog.openTelemetry` section of the application config.
+
+| Option | Default | Description |
+|---|---|---|
+| `serviceName` | `ktor-app` | `service.name`, how PostHog groups the service's spans and logs |
+| `serviceVersion`, `environment` | – | `service.version` and `deployment.environment.name` |
+| `resourceAttributes` | empty | More resource attributes |
+| `traces`, `logs`, `ai` | `true` | What is sent |
+| `privacyMode` | the `PostHog` plugin's | AI spans without prompts, outputs and error messages |
+| `instrumentServer` | `true` | Install the Ktor server instrumentation |
+| `sampler` | parent-based, always on | Which traces are recorded; PostHog does not sample |
+| `flushIntervalMs` | `5000` | How often spans and log records are sent |
+| `maxExportBatchSize`, `maxQueueSize` | `512`, `2048` | Batch size and queue limit |
+| `shutdownTimeoutMs` | `10000` | How long stopping waits for the last spans and logs |
+| `tracerProvider { }`, `loggerProvider { }` | – | Add to the providers, such as a second exporter |
+
+### Your own OpenTelemetry SDK
+
+If your application builds its own SDK, register posthog-server's `PostHogContextSpanProcessor` for the application's client. posthog-ktor hands each call's context to the SDK whenever the call's coroutine runs, so the server span and every span inside the call carry the ids.
+
+```kotlin
+SdkTracerProvider.builder()
+    .apply { posthog.sdk?.let { addSpanProcessor(PostHogContextSpanProcessor(it)) } }
+```
+
+Outside a call, run the work in `application.posthog.withContext { }`, which binds the context to the client the processor belongs to.
+
+## AI observability
+
+[AI observability](https://posthog.com/docs/ai-observability) (LLM analytics) shows what your models cost, how long they take and what they answer, per person and conversation. posthog-ktor captures `$ai_generation`, `$ai_embedding`, `$ai_span` and `$ai_trace` events with PostHog's properties. In a call they belong to the call's person and session, so a conversation links to its session replay.
+
+There are three ways in:
+
+- capture events yourself, for any model client;
+- add `PostHogChatModelListener` to LangChain4j models;
+- send OpenTelemetry `gen_ai` spans from Koog, Spring AI or other instrumented libraries.
+
+### Capture generations
+
+```kotlin
+post("/chat") {
+    val question = call.receiveText()
+    val started = TimeSource.Monotonic.markNow()
+    val answer = openAi.chat(question)
+    call.posthog.ai.captureGeneration {
+        model = "gpt-5-mini"
+        provider = "openai"
+        input = listOf(PostHogAiMessage.system(SYSTEM_PROMPT), PostHogAiMessage.user(question))
+        output = listOf(PostHogAiMessage.assistant(answer.text))
+        inputTokens = answer.usage.inputTokens
+        outputTokens = answer.usage.outputTokens
+        latency = started.elapsedNow()
+    }
+    call.respondText(answer.text)
+}
+```
+
+The builder has a property for each of PostHog's [generation properties](https://posthog.com/docs/ai-observability/installation/manual-capture): `temperature`, `maxTokens`, `tools`, `stream`, `timeToFirstToken`, `stopReason`, `httpStatus`, `baseUrl`, cache tokens, costs and `error`. Anything else goes in `properties`. `captureEmbedding`, `captureSpan` and `captureTrace` work the same. Outside a call, use `application.posthog.ai`.
+
+### Traces and spans
+
+`trace` runs a block as one AI interaction. Generations, embeddings and spans captured inside share its trace id, and the trace is captured at the end with its latency, input, output and error. `span` nests a step, such as a tool call or a retrieval, and becomes the parent of what is captured inside it.
+
+```kotlin
+val answer = call.posthog.ai.trace("answer", sessionId = conversation.id, input = question) {
+    val products = call.posthog.ai.span("search products", input = question) { span ->
+        catalog.search(question).also { span.output = it.map(Product::name) }
+    }
+    model.chat(question, products) // captured with captureGeneration, or by the LangChain4j listener
+}
+```
+
+`sessionId` sets `$ai_session_id`, which groups the traces of a conversation. Without a surrounding trace, each generation is a trace of its own.
+
+### Privacy mode
+
+With `privacyMode = true` on the `PostHog` plugin, AI events go without prompts, outputs and input or output state. Models, tokens, latency and costs still go.
+
+### LangChain4j
+
+`PostHogChatModelListener`, from `posthog-ktor-langchain4j`, captures every call of a LangChain4j chat model as a generation. It records the model, provider, messages, answer, tool calls, tokens, latency, temperature, token limit, tools offered, finish reason and errors.
+
+```kotlin
+val model = OpenAiChatModel.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .modelName("gpt-5-mini")
+    .listeners(listOf(PostHogChatModelListener(application.posthog)))
+    .build()
+```
+
+The generation belongs to the person and session of the call the model was called in, and to the surrounding `trace`; the listener takes them when the request starts. Call blocking models on `Dispatchers.IO`: the context goes along.
+
+### Koog and OpenTelemetry instrumentation
+
+PostHog turns OpenTelemetry spans that follow the GenAI semantic conventions (`gen_ai.*`) into AI events. With [`PostHogOpenTelemetry`](#opentelemetry) installed, AI spans from the application's SDK go there automatically. Each span carries the person, session and properties of the call it started in.
+
+[Koog](https://docs.koog.ai) builds its own OpenTelemetry SDK per agent. Give its OpenTelemetry feature PostHog's exporter, and name the person on the agent's resource: an exporter runs after the request is gone.
+
+```kotlin
+get("/ask") {
+    val agent = AIAgent(promptExecutor = executor, llmModel = OpenAIModels.Chat.GPT4oMini, systemPrompt = "Be brief.") {
+        install(OpenTelemetry) {
+            addSpanExporter(application.posthog.aiSpanExporter()!!)
+            addResourceAttributes(mapOf("posthog.distinct_id" to call.posthog.distinctId!!))
+        }
+    }
+    call.respondText(agent.run(call.receiveText()))
+}
+```
+
+For any other SDK, add `application.posthog.aiSpanProcessor()` to its tracer provider. It works like posthog-node's `PostHogSpanProcessor`: it sends only AI spans, adds the context's person and session, and honours privacy mode.
+
+## Background jobs and message consumers
+
+Work outside a call, such as a message consumer or a scheduled job, can run in a context of its own. Everything captured inside belongs to that person, on any thread:
+
+```kotlin
+application.posthog.withContext(distinctId = order.customerId) {
+    application.posthog.capture("order_delivered")
+}
+```
+
+`withContext` also takes a `sessionId`, and `properties` and `groups` that every event inside carries.
+
+Contexts nest, as in posthog-node: inside a call or another context, `withContext` inherits what it does not set (the distinct id, the session id) and adds its properties and groups to the outer ones. Pass `fresh = true` to start from nothing.
+
+```kotlin
+post("/orders") {
+    // Inherits the call's person, session and request properties; adds a property.
+    application.posthog.withContext(distinctId = null, properties = mapOf("step" to "payment")) {
+        application.posthog.capture("payment_started")
+    }
+}
+```
+
+### Through a message queue
+
+Carry the ids through a queue as message headers. `toHeaders()` writes them as tracing headers, and `PostHogContext.fromHeaders` reads them back. Header names match regardless of case, and the values are cleaned the way the official SDK cleans tracing headers.
+
+```kotlin
+// Producer, during a call
+val record = ProducerRecord(topic, key, value)
+PostHogContext.current()?.toHeaders()?.forEach { (name, id) -> record.headers().add(name, id.toByteArray()) }
+
+// Consumer
+val headers = record.headers().associate { it.key() to it.value().decodeToString() }
+application.posthog.withContext(PostHogContext.fromHeaders(headers) ?: PostHogContext()) {
+    handle(record)
+}
+```
+
+### Work that outlives the call
+
+A coroutine launched from a call may run after the call has ended. Give it a snapshot of the call's context:
+
+```kotlin
+application.launch(PostHogContext.current()!!.snapshot()) {
+    sendReceipt(order)
+}
+```
+
+## Calling other services
+
+The `PostHogTracingHeaders` plugin for Ktor's `HttpClient`, from `posthog-ktor-client`, passes the current distinct id and session id on to the services you call. It sends them only to the hosts you list, either exact names or `*.suffix`.
+
+```kotlin
+val orders = HttpClient(CIO) {
+    install(PostHogTracingHeaders) {
+        hosts += listOf("orders.internal", "*.svc.cluster.local")
+    }
+}
+```
+
+The ids come from the coroutine's `PostHogContext`, or else from the official SDK's request context. A header the request already has is left alone. A Ktor service that receives them with posthog-ktor installed continues with the same person and session.
+
+## Reverse proxy
+
+Ad blockers often drop requests to PostHog's domains. A [reverse proxy](https://posthog.com/docs/advanced/proxy) on your own origin lets them through. Add the proxy route and point posthog-js at it:
+
+```kotlin
+routing {
+    posthogProxy("/ingest")
+}
+```
+
+```js
+posthog.init('<ph_project_token>', {
+    api_host: '/ingest',
+    ui_host: 'https://us.posthog.com',
+})
+```
+
+Requests to `/ingest/static/…` go to PostHog's assets host, and everything else (events, flags, recordings, surveys) goes to the plugin's `host`. Bodies stream through in both directions, compressed as they came. The visitor's cookies and `Authorization` header are not forwarded, and PostHog's `Set-Cookie` does not come back. PostHog gets the visitor's address in `X-Forwarded-For` for GeoIP.
+
+For a self-hosted PostHog or another host, pass `apiHost` and `assetsHost`:
+
+```kotlin
+posthogProxy("/ingest", apiHost = "https://posthog.example.com", assetsHost = "https://posthog.example.com")
+```
+
+## Testing
+
+`posthog-ktor-test` runs the real client against `PostHogFake`, a local fake PostHog server. What your app captures arrives there, and flags come from your test.
+
+```kotlin
+class CheckoutTest : FunSpec({
+    test("an order is captured with the flags the call read") {
+        PostHogFake().use { posthog ->
+            posthog.flag("new-checkout", true)
+            posthog.flag("checkout-button", "buy-now", payload = """{"label":"Buy now"}""")
+
+            testApplication {
+                environment { config = posthog.applicationConfig() }
+                application { module() }
+
+                client.post("/checkout") { header(DISTINCT_ID_HEADER, "anon-1") }
+
+                posthog.assertCaptured("order_placed") {
+                    property("total", 12)
+                    flags shouldBe mapOf("new-checkout" to true)
+                }
+                posthog.assertNotCaptured("order_failed")
+            }
+        }
+    }
+})
+```
+
+`applicationConfig()` points the plugin at the fake and sends every event at once (`flushAt = 1`). Pass your own config to merge it in. `assertCaptured` waits up to 5 seconds for the event and returns it. `assertNotCaptured` waits 500 milliseconds by default.
+
+| Member | Description |
+|---|---|
+| `flag(key, value, payload)` | Sets a flag's remote answer: `true`, `false` or a variant, and an optional JSON payload |
+| `flagDefinitions` | Flag definitions as JSON, for tests of local evaluation |
+| `events`, `captured(event)` | Everything received, or every event of one name |
+| `flagRequests` | The flag evaluations the client asked for |
+| `reset()` | Forgets the events and flag requests received; the flags stay |
+| `CapturedEvent` | `event`, `distinctId`, `properties`, `flags`, `groups`, `property(key)`, `property(key, expected)` |
+
+## Surveys
+
+posthog-js shows surveys in the browser. When people answer somewhere else, such as a server-rendered form or a link in an email, record the answers on the server, the way posthog-js records them:
+
+```kotlin
+post("/feedback") {
+    val form = call.receiveParameters()
+    call.posthog.captureSurveySent(
+        surveyId = "0190-…",
+        responses = mapOf("q-rating" to form["rating"], "q-why" to form["why"]),
+        questions = listOf(PostHogSurveyQuestion("q-rating", "How likely are you to recommend us?")),
+    )
+    call.respondRedirect("/thanks")
+}
+```
+
+Answers go as `$survey_response_<questionId>`: text, a rating as text, or a list of choices. `captureSurveySent` marks the person as having responded and `captureSurveyDismissed` as having dismissed it, so the survey's "don't show again" conditions work. `captureSurveyShown` records the impression. For partial answers, send `completed = false` with a `submissionId`, then send again with the same id.
+
+## Early access features
+
+List the project's [early access features](https://posthog.com/docs/feature-flags/early-access-feature-management) for an opt-in page the server renders, and record the choice:
+
+```kotlin
+get("/labs") {
+    val features = application.posthog.getEarlyAccessFeatures(listOf("beta"))
+    call.respondHtml { /* a switch per feature: name, description, documentationUrl */ }
+}
+post("/labs/{flag}") {
+    call.posthog.updateEarlyAccessFeatureEnrollment(call.parameters["flag"]!!, isEnrolled = true)
+    call.respondRedirect("/labs")
+}
+```
+
+Enrolling sets the person property `$feature_enrollment/<flag>`, which the flag's enrollment condition tests, and the call's flags are evaluated again with it. The list is kept for a minute.
+
+## Session replay
+
+`call.posthog.sessionReplayUrl` links to the call's session replay, like posthog-js' `get_session_replay_url`. Put it in a support ticket, an alert or a log line. It is `null` without a session id. Outside a call, use `application.posthog.sessionReplayUrl(sessionId)`.
+
+The link points to PostHog's app: for PostHog's clouds it follows from the host. For a self-hosted PostHog whose app lives elsewhere, set `uiHost`.
+
+## GeoIP
+
+PostHog adds a person's location from the address of each event. posthog-ktor sends the visitor's address as `$ip` during a call, so PostHog locates the visitor, not your server.
+
+Events without an `$ip`, captured outside a call or with `captureIp = false`, carry `$geoip_disable: true`: PostHog would otherwise use your server's address. Flags are evaluated without GeoIP for the same reason. To skip GeoIP for every event, set `disableGeoip = true`.
+
+## Opt out of data capture
+
+posthog-ktor sends nothing without a project token.
+
+Start opted out with `optOut = true`, and switch at runtime. While opted out, nothing is sent (the SDK's own events included) and every flag is off.
+
+```kotlin
+application.posthog.optOut()
+application.posthog.optIn()
+if (application.posthog.isOptedOut) { /* … */ }
+```
+
+`application.posthog.isEnabled` tells whether events go to PostHog: a project token is set and nobody opted out.
+
+Consent for a single visitor lives in the browser. If posthog-js sends its ids only after a visitor agrees, set `captureWithoutDistinctId = false`, and events about visitors who did not agree are dropped. Flags are already off for calls without a distinct id.
+
+## Flush
+
+Events are queued and sent in batches. `flushAt` sets how many events trigger a send, and `flushIntervalSeconds` sets the longest wait. Both default to the official SDK's values (100 events, 5 seconds).
+
+```kotlin
+install(PostHog) {
+    flushAt = 20
+    flushIntervalSeconds = 10
+}
+```
+
+Send what is queued now with `application.posthog.flush()`. Flushing starts sending in the background. It is not a delivery guarantee.
+
+## Close
+
+When the application stops, the plugin closes the client it created, which sends the queued events first. It waits for that at most `shutdownTimeoutMs` (30 seconds, like posthog-node's `shutdown`), so an unreachable PostHog never holds up a deployment. A client passed in with `client` is not closed: whoever created it closes it.
+
+## Debug mode
+
+Turn on the official SDK's verbose logging to see what is sent and how flags are evaluated, with the `debug` option or at runtime:
+
+```kotlin
+install(PostHog) {
+    debug = true
+}
+
+application.posthog.debug(false)
+```
+
+## All configuration options
+
+The options with a config key can be set in the `posthog` section of the application config. The others are set in code.
+
+| Option | Config key | Type | Default | Description |
+|---|---|---|---|---|
+| `projectToken` | `projectToken` | `String?` | `null` | The project token (`phc_…`). Without one, PostHog is off |
+| `host` | `host` | `String` | `https://us.i.posthog.com` | The ingestion host of your project's region |
+| `uiHost` | `uiHost` | `String?` | Follows from `host` | PostHog's app, for links such as session replays |
+| `shutdownTimeoutMs` | `shutdownTimeoutMs` | `Long` | `30000` | How long stopping waits for queued events |
+| `privacyMode` | `privacyMode` | `Boolean` | `false` | AI events without prompts, outputs and states |
+| `secretKey` | `secretKey` | `String?` | `null` | Feature Flags Secure API Key or personal API key; turns on local flag evaluation |
+| `flushAt` | `flushAt` | `Int?` | SDK default (100) | How many queued events trigger a send |
+| `flushIntervalSeconds` | `flushIntervalSeconds` | `Int?` | SDK default (5) | The longest wait before queued events are sent |
+| `maxQueueSize` | `maxQueueSize` | `Int?` | SDK default (10000) | The most events kept in the queue; the oldest are dropped beyond it |
+| `maxBatchSize` | `maxBatchSize` | `Int?` | SDK default (100) | The most events in one request |
+| `debug` | `debug` | `Boolean` | `false` | The official SDK's verbose logging |
+| `optOut` | `optOut` | `Boolean` | `false` | Start opted out: nothing is sent, every flag is off |
+| `personProfiles` | `personProfiles` | `PersonProfiles` | `ALWAYS` | Which events create person profiles: `ALWAYS`, `IDENTIFIED_ONLY`, `NEVER` |
+| `disableGeoip` | `disableGeoip` | `Boolean` | `false` | Skip GeoIP for every event (events without `$ip` always skip it) |
+| `sendFeatureFlagEvent` | `sendFeatureFlagEvent` | `Boolean` | `true` | Record exposures (`$feature_flag_called`) |
+| `localEvaluation` | `localEvaluation` | `Boolean` | `true` | Evaluate flags locally when a `secretKey` is set |
+| `pollIntervalSeconds` | `pollIntervalSeconds` | `Int?` | SDK default (30) | How often the flag definitions are reloaded |
+| `evaluationContexts` | `evaluationContexts` | `MutableList<String>` | empty | Evaluate only the flags tagged with these contexts (comma-separated in the config) |
+| `inAppIncludes` | `inAppIncludes` | `MutableList<String>` | empty | Package prefixes of in-app stack frames |
+| `captureUncaughtExceptions` | `captureUncaughtExceptions` | `Boolean` | `false` | Report exceptions that end threads outside calls |
+| `releaseIdentifier` | `releaseIdentifier` | `String?` | `null` | The release exceptions are reported with |
+| `customBlockedUserAgents` | `customBlockedUserAgents` | `MutableList<String>` | empty | Calls from these user agents capture nothing |
+| `useTracingHeaders` | `useTracingHeaders` | `Boolean` | `true` | Take the distinct id and session id from posthog-js' tracing headers (and its cookie, for the bootstrap) |
+| `captureIp` | `captureIp` | `Boolean` | `true` | Send the client's address as `$ip` |
+| `captureWithoutDistinctId` | `captureWithoutDistinctId` | `Boolean` | `true` | Send events without a distinct id without a person profile; off, drop them |
+| `logContext` | `logContext` | `Boolean` | `true` | Put `posthogDistinctId` and `sessionId` into the MDC during a call |
+| `captureExceptions` | `captureExceptions` | `Boolean` | `true` | Report failed calls to error tracking |
+| `attachAccessedFlags` | `attachAccessedFlags` | `Boolean` | `true` | Attach the flags a call has read to its events |
+| `client` | – | `PostHogInterface?` | `null` | A client created elsewhere, used instead of one built from these options |
+| `excludedExceptions` | – | `MutableSet<KClass<out Throwable>>` | Client errors, gone clients | Exceptions never reported, with their subclasses |
+| `resolveDistinctId { }` | – | `(ApplicationCall) -> String?` | – | The distinct id of the call's signed-in user |
+| `requestFilter { }` | – | `(ApplicationCall) -> Boolean` | All calls | Calls the plugin handles |
+| `extraProperties { }` | – | `(ApplicationCall) -> Map<String, Any?>` | – | Properties added to every event of a call |
+| `propertiesMap { }` | – | `(Map<String, Any>) -> Map<String, Any>` | – | Changes or removes request properties |
+| `captureStatus { }` | – | `(HttpStatusCode) -> Boolean` | `5xx` | The final statuses that report a failed call |
+| `exceptionFilter { }` | – | `(Throwable, ApplicationCall) -> Boolean` | All | Which failures are reported, on top of the status and exclusions |
+| `flagContext { }` | – | `PostHogEvaluateFlagsOptions.Builder.(ApplicationCall) -> Unit` | – | Person properties, groups and other options for flag evaluation |
+| `beforeSend { }` | – | `(PostHogEvent) -> PostHogEvent?` | – | Change or drop every event; several run in order |
+| `sdk { }` | – | `PostHogConfig.Builder.() -> Unit` | – | Any other option of the official SDK, applied last |
+
+### Official SDK options
+
+`sdk { }` configures the official SDK's `PostHogConfig.Builder` for everything else, such as:
+
+| Option | Default | Description |
+|---|---|---|
+| `featureFlagCacheMaxAgeMs(Int)` | `300000` | How long remote flag results are cached per distinct id |
+| `featureFlagCacheSize(Int)` | `1000` | How many distinct ids' remote flag results are cached |
+| `proxy(java.net.Proxy)` | – | An HTTP proxy for the SDK's requests |
+| `onFeatureFlags(PostHogOnFeatureFlags)` | – | Called when the flag definitions have loaded |
+
+See the [Java SDK docs](https://posthog.com/docs/libraries/java) for all options.
+
+## Platform support
+
+| | Supported |
+|---|---|
+| Java | 17 or later (tested on 17, 21 and 25) |
+| Ktor | 3 (server; the client plugin for Ktor's `HttpClient` 3) |
+| Official SDK | `com.posthog:posthog-server` 2.24 |
+| OpenTelemetry | SDK 1.68, Ktor instrumentation 2.33 (`posthog-ktor-opentelemetry`) |
+| AI libraries | LangChain4j 1.23 (`posthog-ktor-langchain4j`); Koog 1.3 and other `gen_ai` instrumentation through OpenTelemetry |
+
+posthog-ktor is for servers. Browser features come from posthog-js: session replay, surveys, heatmaps, autocapture, early access features, and `reset()` on logout. posthog-ktor links your server events to them through the session id.
+
+Not available, because the official JVM SDK does not offer them: waiting for the delivery of a single event (posthog-node's `captureImmediate`) and an error callback for the SDK's background failures.
+
+## FAQ
+
+### Is posthog-ktor an official PostHog library?
+
+No. It is an independent open-source project under the MIT license. It wraps PostHog's official JVM SDK and uses PostHog's names for options and events.
+
+### How is it different from posthog-server?
+
+posthog-server is the engine: capture, batching, retries and flag evaluation. posthog-ktor adds what a Ktor server needs: a request context that survives coroutine suspensions and thread switches, the browser's ids, request properties, exception capture by final status, flags per call, gated routes, posthog-js bootstrap, a reverse proxy, log and trace context, and a fake PostHog for tests.
+
+### Can I trust the distinct id from the tracing header?
+
+Not for security decisions. The browser sends it and can send any value. Use it for analytics only, and use `resolveDistinctId` for signed-in users.
+
+### Why does the bootstrap not record an exposure?
+
+The bootstrap only prepares posthog-js. posthog-js records the exposure when the page reads the flag, so only visitors who see a variant count in the experiment.
+
+### Why are all my flags off?
+
+Flags are off while PostHog is off (no project token) and for calls without a distinct id. Check that the browser sends its tracing headers, or that `resolveDistinctId` returns the user.
+
+### Does it work with Ktor 2?
+
+No. posthog-ktor needs Ktor 3.

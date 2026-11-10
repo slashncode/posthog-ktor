@@ -39,19 +39,24 @@ public class PostHogContext private constructor(
      * A context for work outside a call, e.g. a message consumer that knows whose message it
      * handles: `launch(PostHogContext(distinctId = userId)) { … }`. Captures see it; to have the
      * official SDK's `PostHogContextSpanProcessor` tag spans too, use [PostHogClient.withContext],
-     * which binds it to the client.
+     * which binds it to the client. Events inside carry [groups] (group analytics) as `$groups`.
      */
     public constructor(
         distinctId: String? = null,
         sessionId: String? = null,
         properties: Map<String, Any?> = emptyMap(),
-    ) : this({ distinctId }, sessionId, properties.withoutNulls().let { { it } }, owner = null, logContext = true)
+        groups: Map<String, String> = emptyMap(),
+    ) : this({ distinctId }, sessionId, properties.withGroups(groups).let { { it } }, owner = null, logContext = true)
 
     /** The distinct id events are captured for, or null for events without a person. */
     public val distinctId: String? get() = distinctIdOf()
 
-    /** Properties every event captured inside the context carries. */
+    /** Properties every event captured inside the context carries (`$groups` included). */
     public val properties: Map<String, Any> get() = propertiesOf()
+
+    /** The groups every event captured inside the context belongs to, by group type. */
+    @Suppress("UNCHECKED_CAST")
+    public val groups: Map<String, String> get() = (properties[GROUPS_PROPERTY] as? Map<String, String>).orEmpty()
 
     /**
      * This context's values as they are now, detached from the call that made it, for work that
@@ -95,8 +100,10 @@ public class PostHogContext private constructor(
             } else {
                 PostHogRequestContext.beginScope(data, true)
             }
-        if (!logContext) return ThreadState(scope, null, null, logContext = false)
-        val state = ThreadState(scope, MDC.get(MDC_DISTINCT_ID), MDC.get(MDC_SESSION_ID), logContext = true)
+        val previousContext = onThread.get()
+        onThread.set(this)
+        if (!logContext) return ThreadState(scope, previousContext, null, null, logContext = false)
+        val state = ThreadState(scope, previousContext, MDC.get(MDC_DISTINCT_ID), MDC.get(MDC_SESSION_ID), logContext = true)
         putOrRemove(MDC_DISTINCT_ID, data.distinctId)
         putOrRemove(MDC_SESSION_ID, data.sessionId)
         return state
@@ -108,6 +115,7 @@ public class PostHogContext private constructor(
     ) {
         val state = oldState as ThreadState
         state.scope.close()
+        onThread.set(state.previousContext)
         if (state.logContext) {
             putOrRemove(MDC_DISTINCT_ID, state.previousDistinctId)
             putOrRemove(MDC_SESSION_ID, state.previousSessionId)
@@ -116,6 +124,7 @@ public class PostHogContext private constructor(
 
     private class ThreadState(
         val scope: PostHogRequestContext.Scope,
+        val previousContext: PostHogContext?,
         val previousDistinctId: String?,
         val previousSessionId: String?,
         val logContext: Boolean,
@@ -155,6 +164,23 @@ public class PostHogContext private constructor(
         ): PostHogContext = PostHogContext(distinctIdOf, sessionId, propertiesOf, owner, logContext)
 
         private const val SESSION_ID_PROPERTY = "\$session_id"
+
+        // The context of the coroutine running on this thread, read live: the SDK's request context
+        // is a copy taken when the coroutine resumed, before e.g. `call.posthog.group` changed it.
+        private val onThread = ThreadLocal<PostHogContext?>()
+
+        internal fun onThread(): PostHogContext? = onThread.get()
+
+        /**
+         * The context of the coroutine running on this thread, if any, for callbacks that cannot
+         * suspend (a model library's listener, an OpenTelemetry span processor).
+         */
+        public fun currentThread(): PostHogContext? = onThread.get()
+
+        private const val GROUPS_PROPERTY = "\$groups"
+
+        private fun Map<String, Any?>.withGroups(groups: Map<String, String>): Map<String, Any> =
+            if (groups.isEmpty()) withoutNulls() else withoutNulls() + (GROUPS_PROPERTY to groups)
 
         private fun putOrRemove(
             key: String,

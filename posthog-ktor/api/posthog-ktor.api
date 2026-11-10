@@ -2,6 +2,158 @@ public final class io/github/slashncode/posthog/ktor/CallLoggingKt {
 	public static final fun posthogContext (Lio/ktor/server/plugins/calllogging/CallLoggingConfig;)V
 }
 
+public final class io/github/slashncode/posthog/ktor/PostHogAi {
+	public final fun captureEmbedding (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun captureEmbedding$default (Lio/github/slashncode/posthog/ktor/PostHogAi;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun captureGeneration (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun captureGeneration$default (Lio/github/slashncode/posthog/ktor/PostHogAi;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun captureSpan (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun captureSpan$default (Lio/github/slashncode/posthog/ktor/PostHogAi;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun captureTrace (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun captureTrace$default (Lio/github/slashncode/posthog/ktor/PostHogAi;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public final fun span (Ljava/lang/String;Ljava/lang/Object;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun span$default (Lio/github/slashncode/posthog/ktor/PostHogAi;Ljava/lang/String;Ljava/lang/Object;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun trace (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun trace$default (Lio/github/slashncode/posthog/ktor/PostHogAi;Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;Lkotlin/jvm/functions/Function3;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiContext : kotlin/coroutines/AbstractCoroutineContextElement, kotlinx/coroutines/ThreadContextElement {
+	public static final field Key Lio/github/slashncode/posthog/ktor/PostHogAiContext$Key;
+	public final fun getSessionId ()Ljava/lang/String;
+	public final fun getSpanId ()Ljava/lang/String;
+	public final fun getTraceId ()Ljava/lang/String;
+	public fun restoreThreadContext (Lkotlin/coroutines/CoroutineContext;Lio/github/slashncode/posthog/ktor/PostHogAiContext;)V
+	public synthetic fun restoreThreadContext (Lkotlin/coroutines/CoroutineContext;Ljava/lang/Object;)V
+	public fun updateThreadContext (Lkotlin/coroutines/CoroutineContext;)Lio/github/slashncode/posthog/ktor/PostHogAiContext;
+	public synthetic fun updateThreadContext (Lkotlin/coroutines/CoroutineContext;)Ljava/lang/Object;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiContext$Key : kotlin/coroutines/CoroutineContext$Key {
+	public final fun current (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun currentThread ()Lio/github/slashncode/posthog/ktor/PostHogAiContext;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiEmbedding : io/github/slashncode/posthog/ktor/PostHogAiEvent {
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getHttpStatus ()Ljava/lang/Integer;
+	public final fun getInput ()Ljava/lang/Object;
+	public final fun getInputTokens ()Ljava/lang/Integer;
+	public final fun getModel ()Ljava/lang/String;
+	public final fun getProvider ()Ljava/lang/String;
+	public final fun getTotalCostUsd ()Ljava/lang/Double;
+	public final fun setBaseUrl (Ljava/lang/String;)V
+	public final fun setHttpStatus (Ljava/lang/Integer;)V
+	public final fun setInput (Ljava/lang/Object;)V
+	public final fun setInputTokens (Ljava/lang/Integer;)V
+	public final fun setModel (Ljava/lang/String;)V
+	public final fun setProvider (Ljava/lang/String;)V
+	public final fun setTotalCostUsd (Ljava/lang/Double;)V
+}
+
+public abstract class io/github/slashncode/posthog/ktor/PostHogAiEvent {
+	public final fun getError ()Ljava/lang/Object;
+	public final fun getLatency-FghU774 ()Lkotlin/time/Duration;
+	public final fun getParentId ()Ljava/lang/String;
+	public final fun getProperties ()Ljava/util/Map;
+	public final fun getSessionId ()Ljava/lang/String;
+	public final fun getSpanId ()Ljava/lang/String;
+	public final fun getSpanName ()Ljava/lang/String;
+	public final fun getTraceId ()Ljava/lang/String;
+	public final fun isError ()Ljava/lang/Boolean;
+	public final fun setError (Ljava/lang/Boolean;)V
+	public final fun setError (Ljava/lang/Object;)V
+	public final fun setLatency-BwNAW2A (Lkotlin/time/Duration;)V
+	public final fun setParentId (Ljava/lang/String;)V
+	public final fun setSessionId (Ljava/lang/String;)V
+	public final fun setSpanId (Ljava/lang/String;)V
+	public final fun setSpanName (Ljava/lang/String;)V
+	public final fun setTraceId (Ljava/lang/String;)V
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiGeneration : io/github/slashncode/posthog/ktor/PostHogAiEvent {
+	public final fun getBaseUrl ()Ljava/lang/String;
+	public final fun getCacheCreationInputTokens ()Ljava/lang/Integer;
+	public final fun getCacheReadInputTokens ()Ljava/lang/Integer;
+	public final fun getHttpStatus ()Ljava/lang/Integer;
+	public final fun getInput ()Ljava/util/List;
+	public final fun getInputCostUsd ()Ljava/lang/Double;
+	public final fun getInputTokens ()Ljava/lang/Integer;
+	public final fun getMaxTokens ()Ljava/lang/Integer;
+	public final fun getModel ()Ljava/lang/String;
+	public final fun getOutput ()Ljava/util/List;
+	public final fun getOutputCostUsd ()Ljava/lang/Double;
+	public final fun getOutputTokens ()Ljava/lang/Integer;
+	public final fun getProvider ()Ljava/lang/String;
+	public final fun getRequestUrl ()Ljava/lang/String;
+	public final fun getStopReason ()Ljava/lang/String;
+	public final fun getStream ()Ljava/lang/Boolean;
+	public final fun getTemperature ()Ljava/lang/Double;
+	public final fun getTimeToFirstToken-FghU774 ()Lkotlin/time/Duration;
+	public final fun getTools ()Ljava/util/List;
+	public final fun getTotalCostUsd ()Ljava/lang/Double;
+	public final fun setBaseUrl (Ljava/lang/String;)V
+	public final fun setCacheCreationInputTokens (Ljava/lang/Integer;)V
+	public final fun setCacheReadInputTokens (Ljava/lang/Integer;)V
+	public final fun setHttpStatus (Ljava/lang/Integer;)V
+	public final fun setInput (Ljava/util/List;)V
+	public final fun setInputCostUsd (Ljava/lang/Double;)V
+	public final fun setInputTokens (Ljava/lang/Integer;)V
+	public final fun setMaxTokens (Ljava/lang/Integer;)V
+	public final fun setModel (Ljava/lang/String;)V
+	public final fun setOutput (Ljava/util/List;)V
+	public final fun setOutputCostUsd (Ljava/lang/Double;)V
+	public final fun setOutputTokens (Ljava/lang/Integer;)V
+	public final fun setProvider (Ljava/lang/String;)V
+	public final fun setRequestUrl (Ljava/lang/String;)V
+	public final fun setStopReason (Ljava/lang/String;)V
+	public final fun setStream (Ljava/lang/Boolean;)V
+	public final fun setTemperature (Ljava/lang/Double;)V
+	public final fun setTimeToFirstToken-BwNAW2A (Lkotlin/time/Duration;)V
+	public final fun setTools (Ljava/util/List;)V
+	public final fun setTotalCostUsd (Ljava/lang/Double;)V
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiKt {
+	public static final fun getAi (Lio/github/slashncode/posthog/ktor/PostHogCall;)Lio/github/slashncode/posthog/ktor/PostHogAi;
+	public static final fun getAi (Lio/github/slashncode/posthog/ktor/PostHogClient;)Lio/github/slashncode/posthog/ktor/PostHogAi;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiMessage {
+	public static final field Companion Lio/github/slashncode/posthog/ktor/PostHogAiMessage$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/Object;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Object;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getContent ()Ljava/lang/Object;
+	public final fun getProperties ()Ljava/util/Map;
+	public final fun getRole ()Ljava/lang/String;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiMessage$Companion {
+	public final fun assistant (Ljava/lang/String;)Lio/github/slashncode/posthog/ktor/PostHogAiMessage;
+	public final fun system (Ljava/lang/String;)Lio/github/slashncode/posthog/ktor/PostHogAiMessage;
+	public final fun user (Ljava/lang/String;)Lio/github/slashncode/posthog/ktor/PostHogAiMessage;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiScope {
+	public final fun getOutput ()Ljava/lang/Object;
+	public final fun getSpanId ()Ljava/lang/String;
+	public final fun getTraceId ()Ljava/lang/String;
+	public final fun setOutput (Ljava/lang/Object;)V
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiSpan : io/github/slashncode/posthog/ktor/PostHogAiEvent {
+	public final fun getInputState ()Ljava/lang/Object;
+	public final fun getOutputState ()Ljava/lang/Object;
+	public final fun setInputState (Ljava/lang/Object;)V
+	public final fun setOutputState (Ljava/lang/Object;)V
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogAiTrace : io/github/slashncode/posthog/ktor/PostHogAiEvent {
+	public final fun getInputState ()Ljava/lang/Object;
+	public final fun getOutputState ()Ljava/lang/Object;
+	public final fun setInputState (Ljava/lang/Object;)V
+	public final fun setOutputState (Ljava/lang/Object;)V
+}
+
 public final class io/github/slashncode/posthog/ktor/PostHogBootstrap {
 	public final fun getDistinctId ()Ljava/lang/String;
 	public final fun getFeatureFlagPayloads ()Ljava/util/Map;
@@ -11,19 +163,37 @@ public final class io/github/slashncode/posthog/ktor/PostHogBootstrap {
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogCall {
+	public final fun alias (Ljava/lang/String;)V
 	public final fun bootstrap (Ljava/util/Collection;ZLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun bootstrap$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/util/Collection;ZLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
-	public final fun capture (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
-	public static synthetic fun capture$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun capture (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;)V
+	public static synthetic fun capture$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;ILjava/lang/Object;)V
 	public final fun captureException (Ljava/lang/Throwable;Ljava/util/Map;)V
 	public static synthetic fun captureException$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/Throwable;Ljava/util/Map;ILjava/lang/Object;)V
+	public final fun captureFeatureInteraction (Ljava/lang/String;)V
+	public final fun captureFeatureView (Ljava/lang/String;)V
+	public final fun capturePageview (Ljava/util/Map;)V
+	public static synthetic fun capturePageview$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/util/Map;ILjava/lang/Object;)V
 	public final fun flags (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getAllFeatureFlags (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getDistinctId ()Ljava/lang/String;
 	public final fun getFeatureFlag (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun getFeatureFlagResult (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun getSessionId ()Ljava/lang/String;
+	public final fun getSessionReplayUrl ()Ljava/lang/String;
+	public final fun group (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
+	public static synthetic fun group$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)V
 	public final fun identify (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)V
 	public static synthetic fun identify$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)V
 	public final fun isFeatureEnabled (Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun resetGroupPropertiesForFlags (Ljava/lang/String;)V
+	public static synthetic fun resetGroupPropertiesForFlags$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun resetPersonPropertiesForFlags ()V
+	public final fun setGroupPropertiesForFlags (Ljava/util/Map;)V
+	public final fun setPersonProperties (Ljava/util/Map;Ljava/util/Map;)V
+	public static synthetic fun setPersonProperties$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)V
+	public final fun setPersonPropertiesForFlags (Ljava/util/Map;)V
+	public final fun unsetPersonProperties (Ljava/util/Collection;)V
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogCallKt {
@@ -32,27 +202,57 @@ public final class io/github/slashncode/posthog/ktor/PostHogCallKt {
 
 public final class io/github/slashncode/posthog/ktor/PostHogClient {
 	public final fun alias (Ljava/lang/String;Ljava/lang/String;)V
-	public final fun capture (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
-	public static synthetic fun capture$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun capture (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/slashncode/posthog/ktor/PostHogFlags;)V
+	public static synthetic fun capture$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/slashncode/posthog/ktor/PostHogFlags;ILjava/lang/Object;)V
 	public final fun captureException (Ljava/lang/Throwable;Ljava/util/Map;Ljava/lang/String;)V
 	public static synthetic fun captureException$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/Throwable;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun captureFeatureInteraction (Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun captureFeatureInteraction$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun captureFeatureView (Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun captureFeatureView$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun capturePageview (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
+	public static synthetic fun capturePageview$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun debug (Z)V
+	public static synthetic fun debug$default (Lio/github/slashncode/posthog/ktor/PostHogClient;ZILjava/lang/Object;)V
+	public final fun evaluateFlags (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun evaluateFlags$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun flush ()V
+	public final fun getAllFeatureFlags (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun getAllFeatureFlags$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getPrivacyMode ()Z
+	public final fun getProjectToken ()Ljava/lang/String;
 	public final fun getSdk ()Lcom/posthog/server/PostHogInterface;
-	public final fun group (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
-	public static synthetic fun group$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)V
+	public final fun getSuperProperties ()Ljava/util/Map;
+	public final fun getUiHost ()Ljava/lang/String;
+	public final fun groupIdentify (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
+	public static synthetic fun groupIdentify$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun identify (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)V
 	public static synthetic fun identify$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)V
 	public final fun isEnabled ()Z
+	public final fun isOptedOut ()Z
+	public final fun optIn ()V
+	public final fun optOut ()V
+	public final fun register (Ljava/util/Map;)V
+	public final fun registerOnce (Ljava/util/Map;)V
+	public final fun reloadFeatureFlags ()V
+	public final fun sessionReplayUrl (Ljava/lang/String;)Ljava/lang/String;
+	public final fun setPersonProperties (Ljava/util/Map;Ljava/util/Map;Ljava/lang/String;)V
+	public static synthetic fun setPersonProperties$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/util/Map;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
+	public final fun unregister (Ljava/lang/String;)V
+	public final fun unsetPersonProperties (Ljava/util/Collection;Ljava/lang/String;)V
+	public static synthetic fun unsetPersonProperties$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/util/Collection;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun withContext (Lio/github/slashncode/posthog/ktor/PostHogContext;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public final fun withContext (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
-	public static synthetic fun withContext$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun withContext (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ZLkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun withContext$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ZLkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogContext : kotlin/coroutines/AbstractCoroutineContextElement, kotlinx/coroutines/ThreadContextElement {
 	public static final field Key Lio/github/slashncode/posthog/ktor/PostHogContext$Key;
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getDistinctId ()Ljava/lang/String;
+	public final fun getGroups ()Ljava/util/Map;
 	public final fun getProperties ()Ljava/util/Map;
 	public final fun getSessionId ()Ljava/lang/String;
 	public fun restoreThreadContext (Lkotlin/coroutines/CoroutineContext;Ljava/lang/Object;)V
@@ -63,6 +263,7 @@ public final class io/github/slashncode/posthog/ktor/PostHogContext : kotlin/cor
 
 public final class io/github/slashncode/posthog/ktor/PostHogContext$Key : kotlin/coroutines/CoroutineContext$Key {
 	public final fun current (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun currentThread ()Lio/github/slashncode/posthog/ktor/PostHogContext;
 	public final fun fromHeaders (Ljava/util/Map;)Lio/github/slashncode/posthog/ktor/PostHogContext;
 }
 
@@ -71,11 +272,40 @@ public final class io/github/slashncode/posthog/ktor/PostHogContextKt {
 	public static final field MDC_SESSION_ID Ljava/lang/String;
 }
 
+public final class io/github/slashncode/posthog/ktor/PostHogEarlyAccessFeature {
+	public final fun getDescription ()Ljava/lang/String;
+	public final fun getDocumentationUrl ()Ljava/lang/String;
+	public final fun getFlagKey ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getPayload ()Ljava/lang/String;
+	public final fun getStage ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogEarlyAccessKt {
+	public static final fun getEarlyAccessFeatures (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/util/Collection;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun getEarlyAccessFeatures$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/util/Collection;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun updateEarlyAccessFeatureEnrollment (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;ZLjava/lang/String;)V
+	public static final fun updateEarlyAccessFeatureEnrollment (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun updateEarlyAccessFeatureEnrollment$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)V
+	public static synthetic fun updateEarlyAccessFeatureEnrollment$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogFlagResult {
+	public final fun getEnabled ()Z
+	public final fun getKey ()Ljava/lang/String;
+	public final fun getPayload ()Ljava/lang/String;
+	public final fun getValue ()Ljava/lang/Object;
+	public final fun getVariant ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/slashncode/posthog/ktor/PostHogFlags {
 	public final fun getDistinctId ()Ljava/lang/String;
 	public final fun getEvaluations ()Lcom/posthog/server/PostHogFeatureFlagEvaluations;
 	public final fun getFlag (Ljava/lang/String;)Ljava/lang/Object;
 	public final fun getFlagPayload (Ljava/lang/String;)Ljava/lang/String;
+	public final fun getFlagResult (Ljava/lang/String;)Lio/github/slashncode/posthog/ktor/PostHogFlagResult;
 	public final fun getKeys ()Ljava/util/List;
 	public final fun isEnabled (Ljava/lang/String;)Z
 }
@@ -83,9 +313,12 @@ public final class io/github/slashncode/posthog/ktor/PostHogFlags {
 public final class io/github/slashncode/posthog/ktor/PostHogFlagsKt {
 	public static final fun getFlagPayloadAs (Lio/github/slashncode/posthog/ktor/PostHogFlags;Ljava/lang/String;Lkotlinx/serialization/DeserializationStrategy;Lkotlinx/serialization/json/Json;)Ljava/lang/Object;
 	public static synthetic fun getFlagPayloadAs$default (Lio/github/slashncode/posthog/ktor/PostHogFlags;Ljava/lang/String;Lkotlinx/serialization/DeserializationStrategy;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Ljava/lang/Object;
+	public static final fun getPayloadAs (Lio/github/slashncode/posthog/ktor/PostHogFlagResult;Lkotlinx/serialization/DeserializationStrategy;Lkotlinx/serialization/json/Json;)Ljava/lang/Object;
+	public static synthetic fun getPayloadAs$default (Lio/github/slashncode/posthog/ktor/PostHogFlagResult;Lkotlinx/serialization/DeserializationStrategy;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
+	public final fun beforeSend (Lkotlin/jvm/functions/Function1;)V
 	public final fun captureStatus (Lkotlin/jvm/functions/Function1;)V
 	public final fun exceptionFilter (Lkotlin/jvm/functions/Function2;)V
 	public final fun extraProperties (Lkotlin/jvm/functions/Function1;)V
@@ -93,15 +326,32 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
 	public final fun getAttachAccessedFlags ()Z
 	public final fun getCaptureExceptions ()Z
 	public final fun getCaptureIp ()Z
+	public final fun getCaptureUncaughtExceptions ()Z
 	public final fun getCaptureWithoutDistinctId ()Z
 	public final fun getClient ()Lcom/posthog/server/PostHogInterface;
+	public final fun getCustomBlockedUserAgents ()Ljava/util/List;
+	public final fun getDebug ()Z
+	public final fun getDisableGeoip ()Z
+	public final fun getEvaluationContexts ()Ljava/util/List;
 	public final fun getExcludedExceptions ()Ljava/util/Set;
 	public final fun getFlushAt ()Ljava/lang/Integer;
 	public final fun getFlushIntervalSeconds ()Ljava/lang/Integer;
 	public final fun getHost ()Ljava/lang/String;
+	public final fun getInAppIncludes ()Ljava/util/List;
+	public final fun getLocalEvaluation ()Z
 	public final fun getLogContext ()Z
+	public final fun getMaxBatchSize ()Ljava/lang/Integer;
+	public final fun getMaxQueueSize ()Ljava/lang/Integer;
+	public final fun getOptOut ()Z
+	public final fun getPersonProfiles ()Lcom/posthog/PersonProfiles;
+	public final fun getPollIntervalSeconds ()Ljava/lang/Integer;
+	public final fun getPrivacyMode ()Z
 	public final fun getProjectToken ()Ljava/lang/String;
+	public final fun getReleaseIdentifier ()Ljava/lang/String;
 	public final fun getSecretKey ()Ljava/lang/String;
+	public final fun getSendFeatureFlagEvent ()Z
+	public final fun getShutdownTimeoutMs ()J
+	public final fun getUiHost ()Ljava/lang/String;
 	public final fun getUseTracingHeaders ()Z
 	public final fun propertiesMap (Lkotlin/jvm/functions/Function1;)V
 	public final fun requestFilter (Lkotlin/jvm/functions/Function1;)V
@@ -110,19 +360,34 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
 	public final fun setAttachAccessedFlags (Z)V
 	public final fun setCaptureExceptions (Z)V
 	public final fun setCaptureIp (Z)V
+	public final fun setCaptureUncaughtExceptions (Z)V
 	public final fun setCaptureWithoutDistinctId (Z)V
 	public final fun setClient (Lcom/posthog/server/PostHogInterface;)V
+	public final fun setDebug (Z)V
+	public final fun setDisableGeoip (Z)V
 	public final fun setFlushAt (Ljava/lang/Integer;)V
 	public final fun setFlushIntervalSeconds (Ljava/lang/Integer;)V
 	public final fun setHost (Ljava/lang/String;)V
+	public final fun setLocalEvaluation (Z)V
 	public final fun setLogContext (Z)V
+	public final fun setMaxBatchSize (Ljava/lang/Integer;)V
+	public final fun setMaxQueueSize (Ljava/lang/Integer;)V
+	public final fun setOptOut (Z)V
+	public final fun setPersonProfiles (Lcom/posthog/PersonProfiles;)V
+	public final fun setPollIntervalSeconds (Ljava/lang/Integer;)V
+	public final fun setPrivacyMode (Z)V
 	public final fun setProjectToken (Ljava/lang/String;)V
+	public final fun setReleaseIdentifier (Ljava/lang/String;)V
 	public final fun setSecretKey (Ljava/lang/String;)V
+	public final fun setSendFeatureFlagEvent (Z)V
+	public final fun setShutdownTimeoutMs (J)V
+	public final fun setUiHost (Ljava/lang/String;)V
 	public final fun setUseTracingHeaders (Z)V
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogPluginKt {
 	public static final field DISTINCT_ID_HEADER Ljava/lang/String;
+	public static final field POSTHOG_EU_HOST Ljava/lang/String;
 	public static final field POSTHOG_US_HOST Ljava/lang/String;
 	public static final field SESSION_ID_HEADER Ljava/lang/String;
 	public static final fun getPostHog ()Lio/ktor/server/application/ApplicationPlugin;
@@ -139,5 +404,32 @@ public final class io/github/slashncode/posthog/ktor/PostHogRoutesKt {
 	public static synthetic fun featureFlag$default (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/ktor/server/routing/Route;
 	public static final fun posthogFlags (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/util/Collection;)Lio/ktor/server/routing/Route;
 	public static synthetic fun posthogFlags$default (Lio/ktor/server/routing/Route;Ljava/lang/String;Ljava/util/Collection;ILjava/lang/Object;)Lio/ktor/server/routing/Route;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogSamplingKt {
+	public static final fun sampleByDistinctId (D)Lkotlin/jvm/functions/Function1;
+	public static final fun sampleByEvent (Ljava/util/Collection;D)Lkotlin/jvm/functions/Function1;
+	public static final fun sampleBySessionId (D)Lkotlin/jvm/functions/Function1;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogSurveyQuestion {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun getId ()Ljava/lang/String;
+	public final fun getQuestion ()Ljava/lang/String;
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogSurveysKt {
+	public static final fun captureSurveyDismissed (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/String;)V
+	public static final fun captureSurveyDismissed (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;)V
+	public static synthetic fun captureSurveyDismissed$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)V
+	public static synthetic fun captureSurveyDismissed$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/lang/Integer;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
+	public static final fun captureSurveySent (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;Z)V
+	public static final fun captureSurveySent (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;ZLjava/lang/String;)V
+	public static synthetic fun captureSurveySent$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/util/Map;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;ZILjava/lang/Object;)V
+	public static synthetic fun captureSurveySent$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/util/List;Ljava/lang/Integer;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)V
+	public static final fun captureSurveyShown (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/lang/Integer;)V
+	public static final fun captureSurveyShown (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;)V
+	public static synthetic fun captureSurveyShown$default (Lio/github/slashncode/posthog/ktor/PostHogCall;Ljava/lang/String;Ljava/lang/Integer;ILjava/lang/Object;)V
+	public static synthetic fun captureSurveyShown$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/Integer;Ljava/lang/String;ILjava/lang/Object;)V
 }
 

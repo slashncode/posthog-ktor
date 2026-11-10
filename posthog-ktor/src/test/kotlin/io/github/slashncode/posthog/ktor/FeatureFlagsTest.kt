@@ -21,9 +21,9 @@ import kotlin.time.Duration.Companion.seconds
 private val shopFlags =
     mapOf(
         "new-checkout" to Flag(true),
-        "checkout-copy" to Flag("calm", """{"button":"Nichts bestellen"}"""),
-        "coach-placement" to Flag(false),
-        "deal-countdown" to Flag("until"),
+        "checkout-button" to Flag("buy-now", """{"label":"Buy now"}"""),
+        "product-reviews" to Flag(false),
+        "banner-style" to Flag("compact"),
     )
 
 private fun PostHogFake.exposures() =
@@ -44,13 +44,13 @@ class FeatureFlagsTest :
                             val posthog = call.posthog
                             posthog.isFeatureEnabled("new-checkout") shouldBe true
                             posthog.isFeatureEnabled("new-checkout") shouldBe true
-                            posthog.getFeatureFlag("checkout-copy") shouldBe "calm"
-                            posthog.flags().getFlagPayloadAs<Map<String, String>>("checkout-copy") shouldBe
-                                mapOf("button" to "Nichts bestellen")
-                            posthog.flags().getFlagPayloadAs<Int>("checkout-copy") shouldBe null
+                            posthog.getFeatureFlag("checkout-button") shouldBe "buy-now"
+                            posthog.flags().getFlagPayloadAs<Map<String, String>>("checkout-button") shouldBe
+                                mapOf("label" to "Buy now")
+                            posthog.flags().getFlagPayloadAs<Int>("checkout-button") shouldBe null
                             posthog.flags().keys shouldContainExactlyInAnyOrder shopFlags.keys
                             posthog.capture("checkout_viewed")
-                            error("kaputt")
+                            error("broken")
                         }
                     }
                 }) {
@@ -60,13 +60,13 @@ class FeatureFlagsTest :
                 fake.flagRequests.size shouldBe 1
                 fake.flagRequests.single().string("distinct_id") shouldBe "anon-1"
                 eventually(10.seconds) { fake.exposures().size shouldBe 2 }
-                fake.exposures() shouldContainExactlyInAnyOrder listOf("new-checkout" to "true", "checkout-copy" to "calm")
+                fake.exposures() shouldContainExactlyInAnyOrder listOf("new-checkout" to "true", "checkout-button" to "buy-now")
                 for (name in listOf("checkout_viewed", "\$exception")) {
                     val event = fake.assertCaptured(name).json
                     event.property("\$feature/new-checkout") shouldBe "true"
-                    event.property("\$feature/checkout-copy") shouldBe "calm"
-                    event.property("\$feature/deal-countdown") shouldBe null
-                    event.arrayProperty("\$active_feature_flags")!! shouldContainExactlyInAnyOrder listOf("new-checkout", "checkout-copy")
+                    event.property("\$feature/checkout-button") shouldBe "buy-now"
+                    event.property("\$feature/banner-style") shouldBe null
+                    event.arrayProperty("\$active_feature_flags")!! shouldContainExactlyInAnyOrder listOf("new-checkout", "checkout-button")
                 }
             }
         }
@@ -98,7 +98,7 @@ class FeatureFlagsTest :
                         attachAccessedFlags = false
                         flagContext { call ->
                             call.request.queryParameters["plan"]?.let { personProperty("plan", it) }
-                            group("company", "nothing-gmbh")
+                            group("company", "acme")
                         }
                     }
                     routing {
@@ -117,7 +117,7 @@ class FeatureFlagsTest :
                 fake.flagRequests.map { it.string("distinct_id") } shouldBe listOf("anon-1", "user-1")
                 val request = fake.flagRequests.last()
                 request["person_properties"]!!.jsonObject["plan"]!!.jsonPrimitive.content shouldBe "pro"
-                request["groups"]!!.jsonObject["company"]!!.jsonPrimitive.content shouldBe "nothing-gmbh"
+                request["groups"]!!.jsonObject["company"]!!.jsonPrimitive.content shouldBe "acme"
                 eventually(10.seconds) { fake.sent().any { it.string("event") == "logged_in" } shouldBe true }
                 fake.assertCaptured("logged_in").json.property("\$feature/new-checkout") shouldBe null
             }

@@ -30,14 +30,14 @@ import kotlinx.html.unsafe
 
 fun main(args: Array<String>) = EngineMain.main(args)
 
-/** The experiment on the checkout button: `control` or `calm`. */
-const val CHECKOUT_COPY = "checkout-copy"
+/** The experiment on the checkout button: `control` or `buy-now`. */
+const val CHECKOUT_BUTTON = "checkout-button"
 
 /** Routes behind this flag exist only for the visitors it is on for. */
 const val EXPRESS_CHECKOUT = "express-checkout"
 
 /**
- * A one-page shop that orders nothing, with PostHog on the server and in the browser:
+ * A one-page general store with PostHog on the server and in the browser:
  * posthog-js loads through the app's own `/ingest` proxy, starts with the server's flags
  * (bootstrap), and server and browser capture for the same person.
  *
@@ -55,14 +55,14 @@ fun Application.module() {
 
     routing {
         posthogProxy("/ingest")
-        posthogFlags("/api/flags", listOf(CHECKOUT_COPY))
+        posthogFlags("/api/flags", listOf(CHECKOUT_BUTTON))
 
         get("/") {
             // First the bootstrap: it names a first-time visitor (minted id) for the rest of the call.
-            val bootstrap = call.posthog.bootstrap(listOf(CHECKOUT_COPY), mintDistinctId = true)
+            val bootstrap = call.posthog.bootstrap(listOf(CHECKOUT_BUTTON), mintDistinctId = true)
             // A server-rendered variant: reading the flag here records the exposure.
-            val calm = call.posthog.getFeatureFlag(CHECKOUT_COPY) == "calm"
-            call.respondHtml { shop(projectToken, host, bootstrap, calm) }
+            val buyNow = call.posthog.getFeatureFlag(CHECKOUT_BUTTON) == "buy-now"
+            call.respondHtml { shop(projectToken, host, bootstrap, buyNow) }
         }
         post("/checkout") {
             call.posthog.capture("order_placed", mapOf("total" to 12.5, "items" to 1))
@@ -75,7 +75,7 @@ fun Application.module() {
             }
         }
         get("/thanks") {
-            call.respondHtml { body { h1 { +"Nothing is on its way." } } }
+            call.respondHtml { body { h1 { +"Thank you for your order." } } }
         }
     }
 }
@@ -84,10 +84,10 @@ private fun HTML.shop(
     projectToken: String?,
     host: String?,
     bootstrap: PostHogBootstrap,
-    calm: Boolean,
+    buyNow: Boolean,
 ) {
     head {
-        title { +"NothingEats sample" }
+        title { +"General Store" }
         if (projectToken != null) {
             // toJson() is escaped for <script>; the token and host come from the app's own config.
             val init =
@@ -103,10 +103,10 @@ private fun HTML.shop(
         }
     }
     body {
-        h1 { +"Order everything. Eat nothing." }
-        p { +"One portion of nothing, 12,50 €." }
+        h1 { +"General Store" }
+        p { +"One umbrella, 12.50." }
         form(action = "/checkout", method = FormMethod.post) {
-            button { +(if (calm) "Order nothing, calmly" else "Order now") }
+            button { +(if (buyNow) "Buy now" else "Order now") }
         }
     }
 }

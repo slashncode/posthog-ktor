@@ -33,6 +33,13 @@ public class CapturedEvent internal constructor(
                 .map { (key, value) -> key.removePrefix(FLAG_PREFIX) to value.toValue() }
                 .toMap()
 
+    /** The groups the event belongs to (`$groups`), by group type. */
+    public val groups: Map<String, String>
+        get() =
+            (properties["\$groups"] as? JsonObject)
+                ?.mapValues { (_, value) -> value.jsonPrimitive.content }
+                .orEmpty()
+
     /**
      * The property's value: a String, Boolean, Long or Double, null if it is missing or null, or the
      * JSON element itself for arrays and objects.

@@ -14,7 +14,7 @@ import kotlinx.serialization.json.putJsonObject
  * values are evaluated without an exposure, which posthog-js records when the page reads a flag.
  *
  * ```kotlin
- * val bootstrap = call.posthog.bootstrap(listOf("checkout-copy"))
+ * val bootstrap = call.posthog.bootstrap(listOf("checkout-button"))
  * call.respondHtml {
  *     head {
  *         script {
