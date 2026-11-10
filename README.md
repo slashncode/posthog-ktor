@@ -2,11 +2,11 @@
 
 PostHog for [Ktor](https://ktor.io) servers: product analytics, feature flags, experiments and error tracking that know which request, person and session they belong to.
 
-> **Status: in development, nothing released yet.** The plan below is what 1.0 ships. Follow the [releases](https://github.com/slashncode/posthog-ktor/releases) for the first version on Maven Central.
+> **Status: in development, nothing released yet.** Releases stay below 1.0 until PostHog has reviewed the library and real users have run it. Follow the [releases](https://github.com/slashncode/posthog-ktor/releases) for the first version on Maven Central.
 
 PostHog has integrations for Django, Rails, Laravel, ASP.NET Core, Express and Next.js. Ktor developers get the JVM server SDK and a request context kept in a `ThreadLocal`, which a coroutine loses when it resumes on another thread. posthog-ktor builds on that official SDK (`com.posthog:posthog-server`: batching, retries, local flag evaluation stay PostHog's) and adds what the framework integrations offer, the Ktor way.
 
-## What 1.0 brings
+## What it brings
 
 | | | |
 |---|---|---|

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-posthog-ktor: a Ktor server integration for PostHog, published to Maven Central as `io.github.slashncode:posthog-ktor`. Standalone open source for general use, meant to be offered to PostHog after 1.0.
+posthog-ktor: a Ktor server integration for PostHog, published to Maven Central as `io.github.slashncode:posthog-ktor`. Standalone open source for general use. Releases stay at 0.x (0.9 at most) until PostHog has reviewed or adopted the library and real users have run it; that is 1.0. PostHog is offered it before then.
 
 ## Commands
 

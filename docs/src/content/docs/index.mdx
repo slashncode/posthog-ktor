@@ -10,7 +10,7 @@ posthog-ktor brings PostHog to [Ktor](https://ktor.io) servers. Use it to captur
 It builds on PostHog's official JVM SDK, [`com.posthog:posthog-server`](https://posthog.com/docs/libraries/java), which handles batching, retries and local flag evaluation. posthog-ktor adds what Ktor needs. Each request gets a context that follows its coroutine across suspensions and threads. Every event, flag evaluation, exception, log line and span of the request then belongs to the same person and session as the browser that sent it.
 
 <Aside type="caution" title="Pre-release">
-  posthog-ktor is in development and not on Maven Central yet. Its API may change before 1.0. It is an independent open-source project, not an official PostHog library.
+  posthog-ktor is in development and not on Maven Central yet. Releases stay below 1.0 until PostHog has reviewed the library and real users have run it, and the API may change until then. It is an independent open-source project, not an official PostHog library.
 </Aside>
 
 <Aside>
