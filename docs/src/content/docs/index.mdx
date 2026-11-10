@@ -10,7 +10,7 @@ posthog-ktor brings PostHog to [Ktor](https://ktor.io) servers. Use it to captur
 It builds on PostHog's official JVM SDK, [`com.posthog:posthog-server`](https://posthog.com/docs/libraries/java), which handles batching, retries and local flag evaluation. posthog-ktor adds what Ktor needs. Each request gets a context that follows its coroutine across suspensions and threads. Every event, flag evaluation, exception, log line and span of the request then belongs to the same person and session as the browser that sent it.
 
 <Aside type="caution" title="Pre-release">
-  posthog-ktor is in development and not on Maven Central yet. Releases stay below 1.0 until PostHog has reviewed the library and real users have run it, and the API may change until then. It is an independent open-source project, not an official PostHog library.
+  posthog-ktor is in development and not on Maven Central yet. Releases stay below 1.0 while the API may still change and the library is being tried in real applications; testers and feedback are welcome. It is an independent open-source project, not an official PostHog library.
 </Aside>
 
 <Aside>
@@ -100,14 +100,38 @@ fun Application.module() {
 
 When the application stops, the plugin flushes the queued events and closes its client.
 
-### Use an existing client
+### Share the client with work outside the application
 
-If your application already creates a `posthog-server` client, pass it to the plugin. The plugin uses it instead of building its own and does not close it. The options that shape every event the SDK sends (`beforeSend`, `disableGeoip`, `personProfiles = NEVER`, super properties and opting out) then apply only to what posthog-ktor captures, not to the SDK's own events.
+Some code needs PostHog before or outside the Ktor application: a dependency injection container that creates services first, a message consumer, a scheduled task that runs the same binary without a server. Make the client yourself with `PostHogClient { }`. It takes the same client options as the plugin, and optionally the `posthog` section of a config to read them from. Then hand it to the plugin, so calls capture with the same client.
 
 ```kotlin
-install(PostHog) {
-    client = existingPostHogClient
+val posthog = PostHogClient {
+    projectToken = "<ph_project_token>"
+    host = POSTHOG_EU_HOST
 }
+
+fun Application.module() {
+    install(PostHog) {
+        client = posthog
+        resolveDistinctId { it.principal<UserIdPrincipal>()?.name }
+    }
+}
+
+// In a worker, with or without a server
+posthog.withContext(distinctId = order.customerId) {
+    posthog.capture("order_shipped")
+}
+
+// When the process ends
+posthog.close()
+```
+
+The plugin uses the client as it is: the client options in the `install(PostHog) { }` block are ignored, and the options for calls (`resolveDistinctId`, `captureExceptions` and the others) still apply. The plugin does not close a client it did not make. `close()` sends what is queued, waits at most `shutdownTimeoutMs`, and turns the client off.
+
+If your application already creates a `posthog-server` client, pass it as `sdkClient`. posthog-ktor then uses it instead of building its own, and `close()` flushes it without closing it. The options that shape every event the SDK sends (`beforeSend`, `disableGeoip`, `personProfiles = NEVER`, super properties and opting out) then apply only to what posthog-ktor captures, not to the SDK's own events.
+
+```kotlin
+val posthog = PostHogClient { sdkClient = existingPostHogClient }
 ```
 
 ### Link server events to the browser
@@ -1092,7 +1116,7 @@ application.posthog.debug(false)
 
 ## All configuration options
 
-The options with a config key can be set in the `posthog` section of the application config. The others are set in code.
+The options with a config key can be set in the `posthog` section of the application config. The others are set in code. `PostHogClient { }` takes the options from `projectToken` to `sdkClient` and `beforeSend { }` and `sdk { }`; the plugin takes all of them.
 
 | Option | Config key | Type | Default | Description |
 |---|---|---|---|---|
@@ -1117,14 +1141,15 @@ The options with a config key can be set in the `posthog` section of the applica
 | `inAppIncludes` | `inAppIncludes` | `MutableList<String>` | empty | Package prefixes of in-app stack frames |
 | `captureUncaughtExceptions` | `captureUncaughtExceptions` | `Boolean` | `false` | Report exceptions that end threads outside calls |
 | `releaseIdentifier` | `releaseIdentifier` | `String?` | `null` | The release exceptions are reported with |
+| `captureWithoutDistinctId` | `captureWithoutDistinctId` | `Boolean` | `true` | Send events without a distinct id without a person profile; off, drop them |
+| `sdkClient` | – | `PostHogInterface?` | `null` | A `posthog-server` client created elsewhere, used instead of one built from these options |
 | `customBlockedUserAgents` | `customBlockedUserAgents` | `MutableList<String>` | empty | Calls from these user agents capture nothing |
 | `useTracingHeaders` | `useTracingHeaders` | `Boolean` | `true` | Take the distinct id and session id from posthog-js' tracing headers (and its cookie, for the bootstrap) |
 | `captureIp` | `captureIp` | `Boolean` | `true` | Send the client's address as `$ip` |
-| `captureWithoutDistinctId` | `captureWithoutDistinctId` | `Boolean` | `true` | Send events without a distinct id without a person profile; off, drop them |
 | `logContext` | `logContext` | `Boolean` | `true` | Put `posthogDistinctId` and `sessionId` into the MDC during a call |
 | `captureExceptions` | `captureExceptions` | `Boolean` | `true` | Report failed calls to error tracking |
 | `attachAccessedFlags` | `attachAccessedFlags` | `Boolean` | `true` | Attach the flags a call has read to its events |
-| `client` | – | `PostHogInterface?` | `null` | A client created elsewhere, used instead of one built from these options |
+| `client` | – | `PostHogClient?` | `null` | A client made with `PostHogClient { }`, shared with work outside the application; the plugin only |
 | `excludedExceptions` | – | `MutableSet<KClass<out Throwable>>` | Client errors, gone clients | Exceptions never reported, with their subclasses |
 | `resolveDistinctId { }` | – | `(ApplicationCall) -> String?` | – | The distinct id of the call's signed-in user |
 | `requestFilter { }` | – | `(ApplicationCall) -> Boolean` | All calls | Calls the plugin handles |

@@ -2,7 +2,7 @@
 
 PostHog for [Ktor](https://ktor.io) servers: product analytics, feature flags, experiments and error tracking that know which request, person and session they belong to.
 
-> **Status: in development, nothing released yet.** Releases stay below 1.0 until PostHog has reviewed the library and real users have run it. Follow the [releases](https://github.com/slashncode/posthog-ktor/releases) for the first version on Maven Central.
+> **Status: in development, nothing released yet.** Releases stay below 1.0 while the API may still change and the library is being tried in real applications; testers and feedback are welcome. Follow the [releases](https://github.com/slashncode/posthog-ktor/releases) for the first version on Maven Central.
 
 PostHog has integrations for Django, Rails, Laravel, ASP.NET Core, Express and Next.js. Ktor developers get the JVM server SDK and a request context kept in a `ThreadLocal`, which a coroutine loses when it resumes on another thread. posthog-ktor builds on that official SDK (`com.posthog:posthog-server`: batching, retries, local flag evaluation stay PostHog's) and adds what the framework integrations offer, the Ktor way.
 
@@ -17,7 +17,7 @@ PostHog has integrations for Django, Rails, Laravel, ASP.NET Core, Express and N
 | **Feature flags** | One evaluation per request, payloads decoded with kotlinx.serialization, routes gated by a flag (`featureFlag("new-checkout") { … }`), the flags a request read attached to its events | ✓ |
 | **Bootstrapping posthog-js** | A route that hands a single-page app its flags before the first render, and the same for server-rendered pages, without counting an exposure | ✓ |
 | **Reverse proxy** | `/ingest` forwarded to PostHog, so ad blockers do not drop events | ✓ |
-| **Beyond the request** | The context for background jobs and message consumers, through message headers; a Ktor `HttpClient` plugin passing it on to other services (`posthog-ktor-client`) | ✓ |
+| **Beyond the request** | One client for calls and for work outside the application (`PostHogClient { }` for a worker or a dependency injection container); the context for background jobs and message consumers, through message headers; a Ktor `HttpClient` plugin passing it on to other services (`posthog-ktor-client`) | ✓ |
 | **The SDKs' API** | What PostHog's own SDKs offer, for a server: `beforeSend` hooks and sampling, super properties, person properties (`setPersonProperties`, `unset…`), person profiles (`IDENTIFIED_ONLY`), groups for a call or an event, opting out at runtime, GeoIP from the visitor's address only, flag results with payloads, flags outside calls, overriding person and group properties for flags, enriched flag analytics, pageviews | ✓ |
 | **AI observability** | Generations, embeddings, spans and traces (`call.posthog.ai`), LangChain4j's chat models (`posthog-ktor-langchain4j`), and Koog or any OpenTelemetry `gen_ai` instrumentation, for the call's person and session, with privacy mode | ✓ |
 | **OpenTelemetry** | Traces, Logback logs and AI spans to PostHog without a collector, every span and log line with the call's person and session (`posthog-ktor-opentelemetry`) | ✓ |

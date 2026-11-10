@@ -8,6 +8,8 @@ import com.posthog.server.PostHogFeatureFlagEvaluations
 import com.posthog.server.PostHogFeatureFlagResultOptions
 import com.posthog.server.PostHogInterface
 import com.posthog.server.PostHogRequestContext
+import io.ktor.server.config.ApplicationConfig
+import io.ktor.server.config.MapApplicationConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,18 +17,25 @@ import kotlinx.coroutines.currentCoroutineContext
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * The application's PostHog client. Inside a call, or a [PostHogContext], captures without an
- * explicit distinct id use the context's. Every call is a no-op while PostHog is off (no project
- * token) or opted out, so code that captures needs no checks of its own.
+ * A PostHog client: the application's (`application.posthog`, built by the [PostHog] plugin), or
+ * one made with `PostHogClient { }` for work outside an application. Inside a call, or a
+ * [PostHogContext], captures without an explicit distinct id use the context's. Every call is a
+ * no-op while PostHog is off (no project token), opted out or closed, so code that captures needs
+ * no checks of its own.
  */
 public class PostHogClient internal constructor(
-    private val config: PostHogPluginConfig,
-) {
+    private val config: PostHogClientConfig,
+) : AutoCloseable {
     /** The official SDK's client, for everything this library does not wrap; null while PostHog is off. */
     public var sdk: PostHogInterface? = null
         internal set
+
+    // Whether close() closes the SDK's client: only one built here, not an sdkClient.
+    private var ownsSdk = false
+    private val closed = AtomicBoolean(false)
 
     @Volatile private var optedOut: Boolean = config.optOut
     private val registered = ConcurrentHashMap<String, Any>()
@@ -473,6 +482,19 @@ public class PostHogClient internal constructor(
         sdk?.flush()
     }
 
+    /**
+     * Sends what is queued and closes the official SDK's client, waiting at most `shutdownTimeoutMs`
+     * for PostHog, as posthog-node's `shutdown()`. Every call is a no-op afterwards. The plugin closes
+     * the client it builds when the application stops; a client made with `PostHogClient { }` is
+     * closed by whoever made it. An `sdkClient` is flushed, not closed. Closing twice does nothing.
+     */
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        val client = sdk ?: return
+        sdk = null
+        if (ownsSdk) client.closeWithin(config.shutdownTimeoutMs) else client.flush()
+    }
+
     // An explicit distinct id names a known person: with IDENTIFIED_ONLY its events get a profile.
     private fun Map<String, Any?>.withExplicitPerson(distinctId: String?): Map<String, Any?> =
         if (distinctId != null && config.personProfiles == PersonProfiles.IDENTIFIED_ONLY) this + (PROCESS_PERSON_PROFILE to true) else this
@@ -497,6 +519,24 @@ public class PostHogClient internal constructor(
 
     internal companion object {
         private val log = LoggerFactory.getLogger(PostHogClient::class.java)
+
+        fun create(config: PostHogClientConfig): PostHogClient {
+            val client = PostHogClient(config)
+            val sdk = config.sdkClient ?: config.buildSdk(client)
+            client.sdk = sdk
+            client.ownsSdk = config.sdkClient == null
+            sdk?.takeIf { config.debug }?.debug(true)
+            return client
+        }
+
+        // close() flushes and may retry against an unreachable PostHog; the application stops regardless.
+        private fun PostHogInterface.closeWithin(timeoutMs: Long) {
+            val closing = Thread({ close() }, "posthog-shutdown").apply { isDaemon = true }
+            closing.start()
+            closing.join(timeoutMs.coerceAtLeast(1))
+            if (closing.isAlive) log.warn("PostHog did not finish sending within {} ms; stopping without waiting", timeoutMs)
+        }
+
         const val GROUPS = "\$groups"
         const val CURRENT_URL = "\$current_url"
         const val PAGEVIEW = "\$pageview"
@@ -507,3 +547,26 @@ public class PostHogClient internal constructor(
         const val FEATURE_FLAG = "feature_flag"
     }
 }
+
+/**
+ * A PostHog client made outside a Ktor application: for code that runs without one (a worker, a
+ * scheduled task in another process mode) or is set up before it (a dependency injection
+ * container). Hand it to the plugin with `install(PostHog) { client = posthog }` to have calls
+ * capture with the same client. Whoever makes it closes it ([PostHogClient.close]).
+ *
+ * ```kotlin
+ * val posthog = PostHogClient {
+ *     projectToken = "phc_…"
+ *     host = POSTHOG_EU_HOST
+ * }
+ * posthog.withContext(distinctId = order.customerId) { posthog.capture("order_shipped") }
+ * posthog.close()
+ * ```
+ *
+ * @param config the `posthog` section of an application config to read the options from first,
+ *   as the plugin does: `ApplicationConfig("application.conf").config("posthog")`.
+ */
+public fun PostHogClient(
+    config: ApplicationConfig = MapApplicationConfig(),
+    configure: PostHogClientConfig.() -> Unit = {},
+): PostHogClient = PostHogClient.create(PostHogClientConfig(config).apply(configure))

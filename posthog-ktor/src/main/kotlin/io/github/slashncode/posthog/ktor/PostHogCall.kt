@@ -327,12 +327,12 @@ internal class PostHogCallState(
                 buildMap {
                     if (callGroups.isNotEmpty()) put(PostHogClient.GROUPS, callGroups.toMap())
                     // Explicit both ways: the SDK's copy of the context may still say otherwise.
-                    if (config.personProfiles != PersonProfiles.ALWAYS && distinctId != null) put(PROCESS_PERSON_PROFILE, processesPersons)
+                    if (client.personProfiles != PersonProfiles.ALWAYS && distinctId != null) put(PROCESS_PERSON_PROFILE, processesPersons)
                 }
 
     private val processesPersons: Boolean
         get() =
-            when (config.personProfiles) {
+            when (client.personProfiles) {
                 PersonProfiles.ALWAYS -> true
                 PersonProfiles.NEVER -> false
                 PersonProfiles.IDENTIFIED_ONLY -> isIdentified || personProcessing
@@ -451,7 +451,7 @@ internal class PostHogCallState(
     }
 
     private fun cookieDistinctId(): String? {
-        val token = config.projectToken ?: return null
+        val token = client.projectToken ?: return null
         if (!config.useTracingHeaders) return null
         val cookie = call.request.cookies["ph_${token}_posthog"] ?: return null
         return try {

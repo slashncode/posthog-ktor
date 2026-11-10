@@ -200,7 +200,7 @@ public final class io/github/slashncode/posthog/ktor/PostHogCallKt {
 	public static final fun getPosthog (Lio/ktor/server/application/ApplicationCall;)Lio/github/slashncode/posthog/ktor/PostHogCall;
 }
 
-public final class io/github/slashncode/posthog/ktor/PostHogClient {
+public final class io/github/slashncode/posthog/ktor/PostHogClient : java/lang/AutoCloseable {
 	public final fun alias (Ljava/lang/String;Ljava/lang/String;)V
 	public final fun capture (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/slashncode/posthog/ktor/PostHogFlags;)V
 	public static synthetic fun capture$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Ljava/util/Map;Ljava/time/Instant;Lio/github/slashncode/posthog/ktor/PostHogFlags;ILjava/lang/Object;)V
@@ -212,6 +212,7 @@ public final class io/github/slashncode/posthog/ktor/PostHogClient {
 	public static synthetic fun captureFeatureView$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)V
 	public final fun capturePageview (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)V
 	public static synthetic fun capturePageview$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)V
+	public fun close ()V
 	public final fun debug (Z)V
 	public static synthetic fun debug$default (Lio/github/slashncode/posthog/ktor/PostHogClient;ZILjava/lang/Object;)V
 	public final fun evaluateFlags (Ljava/lang/String;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
@@ -245,6 +246,60 @@ public final class io/github/slashncode/posthog/ktor/PostHogClient {
 	public final fun withContext (Lio/github/slashncode/posthog/ktor/PostHogContext;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun withContext (Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ZLkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun withContext$default (Lio/github/slashncode/posthog/ktor/PostHogClient;Ljava/lang/String;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ZLkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public class io/github/slashncode/posthog/ktor/PostHogClientConfig {
+	public final fun beforeSend (Lkotlin/jvm/functions/Function1;)V
+	public final fun getCaptureUncaughtExceptions ()Z
+	public final fun getCaptureWithoutDistinctId ()Z
+	public final fun getDebug ()Z
+	public final fun getDisableGeoip ()Z
+	public final fun getEvaluationContexts ()Ljava/util/List;
+	public final fun getFlushAt ()Ljava/lang/Integer;
+	public final fun getFlushIntervalSeconds ()Ljava/lang/Integer;
+	public final fun getHost ()Ljava/lang/String;
+	public final fun getInAppIncludes ()Ljava/util/List;
+	public final fun getLocalEvaluation ()Z
+	public final fun getMaxBatchSize ()Ljava/lang/Integer;
+	public final fun getMaxQueueSize ()Ljava/lang/Integer;
+	public final fun getOptOut ()Z
+	public final fun getPersonProfiles ()Lcom/posthog/PersonProfiles;
+	public final fun getPollIntervalSeconds ()Ljava/lang/Integer;
+	public final fun getPrivacyMode ()Z
+	public final fun getProjectToken ()Ljava/lang/String;
+	public final fun getReleaseIdentifier ()Ljava/lang/String;
+	public final fun getSdkClient ()Lcom/posthog/server/PostHogInterface;
+	public final fun getSecretKey ()Ljava/lang/String;
+	public final fun getSendFeatureFlagEvent ()Z
+	public final fun getShutdownTimeoutMs ()J
+	public final fun getUiHost ()Ljava/lang/String;
+	public final fun sdk (Lkotlin/jvm/functions/Function1;)V
+	public final fun setCaptureUncaughtExceptions (Z)V
+	public final fun setCaptureWithoutDistinctId (Z)V
+	public final fun setDebug (Z)V
+	public final fun setDisableGeoip (Z)V
+	public final fun setFlushAt (Ljava/lang/Integer;)V
+	public final fun setFlushIntervalSeconds (Ljava/lang/Integer;)V
+	public final fun setHost (Ljava/lang/String;)V
+	public final fun setLocalEvaluation (Z)V
+	public final fun setMaxBatchSize (Ljava/lang/Integer;)V
+	public final fun setMaxQueueSize (Ljava/lang/Integer;)V
+	public final fun setOptOut (Z)V
+	public final fun setPersonProfiles (Lcom/posthog/PersonProfiles;)V
+	public final fun setPollIntervalSeconds (Ljava/lang/Integer;)V
+	public final fun setPrivacyMode (Z)V
+	public final fun setProjectToken (Ljava/lang/String;)V
+	public final fun setReleaseIdentifier (Ljava/lang/String;)V
+	public final fun setSdkClient (Lcom/posthog/server/PostHogInterface;)V
+	public final fun setSecretKey (Ljava/lang/String;)V
+	public final fun setSendFeatureFlagEvent (Z)V
+	public final fun setShutdownTimeoutMs (J)V
+	public final fun setUiHost (Ljava/lang/String;)V
+}
+
+public final class io/github/slashncode/posthog/ktor/PostHogClientKt {
+	public static final fun PostHogClient (Lio/ktor/server/config/ApplicationConfig;Lkotlin/jvm/functions/Function1;)Lio/github/slashncode/posthog/ktor/PostHogClient;
+	public static synthetic fun PostHogClient$default (Lio/ktor/server/config/ApplicationConfig;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/slashncode/posthog/ktor/PostHogClient;
 }
 
 public final class io/github/slashncode/posthog/ktor/PostHogContext : kotlin/coroutines/AbstractCoroutineContextElement, kotlinx/coroutines/ThreadContextElement {
@@ -317,8 +372,7 @@ public final class io/github/slashncode/posthog/ktor/PostHogFlagsKt {
 	public static synthetic fun getPayloadAs$default (Lio/github/slashncode/posthog/ktor/PostHogFlagResult;Lkotlinx/serialization/DeserializationStrategy;Lkotlinx/serialization/json/Json;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
-public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
-	public final fun beforeSend (Lkotlin/jvm/functions/Function1;)V
+public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig : io/github/slashncode/posthog/ktor/PostHogClientConfig {
 	public final fun captureStatus (Lkotlin/jvm/functions/Function1;)V
 	public final fun exceptionFilter (Lkotlin/jvm/functions/Function2;)V
 	public final fun extraProperties (Lkotlin/jvm/functions/Function1;)V
@@ -326,62 +380,19 @@ public final class io/github/slashncode/posthog/ktor/PostHogPluginConfig {
 	public final fun getAttachAccessedFlags ()Z
 	public final fun getCaptureExceptions ()Z
 	public final fun getCaptureIp ()Z
-	public final fun getCaptureUncaughtExceptions ()Z
-	public final fun getCaptureWithoutDistinctId ()Z
-	public final fun getClient ()Lcom/posthog/server/PostHogInterface;
+	public final fun getClient ()Lio/github/slashncode/posthog/ktor/PostHogClient;
 	public final fun getCustomBlockedUserAgents ()Ljava/util/List;
-	public final fun getDebug ()Z
-	public final fun getDisableGeoip ()Z
-	public final fun getEvaluationContexts ()Ljava/util/List;
 	public final fun getExcludedExceptions ()Ljava/util/Set;
-	public final fun getFlushAt ()Ljava/lang/Integer;
-	public final fun getFlushIntervalSeconds ()Ljava/lang/Integer;
-	public final fun getHost ()Ljava/lang/String;
-	public final fun getInAppIncludes ()Ljava/util/List;
-	public final fun getLocalEvaluation ()Z
 	public final fun getLogContext ()Z
-	public final fun getMaxBatchSize ()Ljava/lang/Integer;
-	public final fun getMaxQueueSize ()Ljava/lang/Integer;
-	public final fun getOptOut ()Z
-	public final fun getPersonProfiles ()Lcom/posthog/PersonProfiles;
-	public final fun getPollIntervalSeconds ()Ljava/lang/Integer;
-	public final fun getPrivacyMode ()Z
-	public final fun getProjectToken ()Ljava/lang/String;
-	public final fun getReleaseIdentifier ()Ljava/lang/String;
-	public final fun getSecretKey ()Ljava/lang/String;
-	public final fun getSendFeatureFlagEvent ()Z
-	public final fun getShutdownTimeoutMs ()J
-	public final fun getUiHost ()Ljava/lang/String;
 	public final fun getUseTracingHeaders ()Z
 	public final fun propertiesMap (Lkotlin/jvm/functions/Function1;)V
 	public final fun requestFilter (Lkotlin/jvm/functions/Function1;)V
 	public final fun resolveDistinctId (Lkotlin/jvm/functions/Function1;)V
-	public final fun sdk (Lkotlin/jvm/functions/Function1;)V
 	public final fun setAttachAccessedFlags (Z)V
 	public final fun setCaptureExceptions (Z)V
 	public final fun setCaptureIp (Z)V
-	public final fun setCaptureUncaughtExceptions (Z)V
-	public final fun setCaptureWithoutDistinctId (Z)V
-	public final fun setClient (Lcom/posthog/server/PostHogInterface;)V
-	public final fun setDebug (Z)V
-	public final fun setDisableGeoip (Z)V
-	public final fun setFlushAt (Ljava/lang/Integer;)V
-	public final fun setFlushIntervalSeconds (Ljava/lang/Integer;)V
-	public final fun setHost (Ljava/lang/String;)V
-	public final fun setLocalEvaluation (Z)V
+	public final fun setClient (Lio/github/slashncode/posthog/ktor/PostHogClient;)V
 	public final fun setLogContext (Z)V
-	public final fun setMaxBatchSize (Ljava/lang/Integer;)V
-	public final fun setMaxQueueSize (Ljava/lang/Integer;)V
-	public final fun setOptOut (Z)V
-	public final fun setPersonProfiles (Lcom/posthog/PersonProfiles;)V
-	public final fun setPollIntervalSeconds (Ljava/lang/Integer;)V
-	public final fun setPrivacyMode (Z)V
-	public final fun setProjectToken (Ljava/lang/String;)V
-	public final fun setReleaseIdentifier (Ljava/lang/String;)V
-	public final fun setSecretKey (Ljava/lang/String;)V
-	public final fun setSendFeatureFlagEvent (Z)V
-	public final fun setShutdownTimeoutMs (J)V
-	public final fun setUiHost (Ljava/lang/String;)V
 	public final fun setUseTracingHeaders (Z)V
 }
 

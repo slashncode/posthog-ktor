@@ -31,9 +31,10 @@ public const val POSTHOG_US_HOST: String = "https://us.i.posthog.com"
 public const val POSTHOG_EU_HOST: String = "https://eu.i.posthog.com"
 
 /**
- * Configuration of the [PostHog] plugin. Values come from the `posthog` section of the application
- * config (`application.conf` or `application.yaml`) first; the `install(PostHog) { }` block can
- * override them.
+ * Options of a [PostHogClient]: where events go, how they are batched, what every event carries.
+ * `install(PostHog) { }` takes them (see [PostHogPluginConfig]), and so does `PostHogClient { }` for
+ * a client made outside the application. Values come from the `posthog` section of the application
+ * config (`application.conf` or `application.yaml`) first; code can override them.
  *
  * ```hocon
  * posthog {
@@ -42,7 +43,7 @@ public const val POSTHOG_EU_HOST: String = "https://eu.i.posthog.com"
  * }
  * ```
  */
-public class PostHogPluginConfig internal constructor(
+public open class PostHogClientConfig internal constructor(
     config: ApplicationConfig,
 ) {
     /**
@@ -148,32 +149,6 @@ public class PostHogPluginConfig internal constructor(
     public var releaseIdentifier: String? = config.string("releaseIdentifier")
 
     /**
-     * Calls whose `User-Agent` contains one of these (ignoring case) capture nothing, as posthog-js'
-     * `custom_blocked_useragents`: bots, uptime checks. `call.posthog` does nothing in them and their
-     * exceptions are not reported.
-     */
-    public val customBlockedUserAgents: MutableList<String> = config.list("customBlockedUserAgents").toMutableList()
-
-    /**
-     * A client created elsewhere, used instead of one built from this configuration. The plugin
-     * does not close it; whoever created it does. The options that shape every event the SDK sends
-     * ([beforeSend], [disableGeoip], [PersonProfiles.NEVER], super properties, opting out) need the
-     * plugin's own client; with this one they apply to what posthog-ktor captures only.
-     */
-    public var client: PostHogInterface? = null
-
-    /**
-     * Whether a call's distinct id and session id come from the tracing headers posthog-js sends
-     * (`X-PostHog-Distinct-Id`, `X-PostHog-Session-Id`). They link server events to the browser's
-     * person and session replay. The browser controls them: they are analytics context, never
-     * authentication or authorization.
-     */
-    public var useTracingHeaders: Boolean = config.boolean("useTracingHeaders") ?: true
-
-    /** Whether events carry the client's address as `$ip` (honouring Ktor's forwarded-headers plugins). */
-    public var captureIp: Boolean = config.boolean("captureIp") ?: true
-
-    /**
      * Whether an event without any distinct id is still sent, under a random id and without a person
      * profile (`$process_person_profile: false`), as the official SDK does. Off, such events are
      * dropped: with posthog-js sending its ids only after the visitor agreed to analytics, that
@@ -181,34 +156,17 @@ public class PostHogPluginConfig internal constructor(
      */
     public var captureWithoutDistinctId: Boolean = config.boolean("captureWithoutDistinctId") ?: true
 
-    /** Whether log lines written during a call carry [MDC_DISTINCT_ID] and [MDC_SESSION_ID] in the MDC. */
-    public var logContext: Boolean = config.boolean("logContext") ?: true
-
-    /** Whether exceptions of a call go to PostHog error tracking (see [captureStatus], [excludedExceptions]). */
-    public var captureExceptions: Boolean = config.boolean("captureExceptions") ?: true
-
     /**
-     * Whether events captured in a call (exceptions included) carry the flags the call has read
-     * through `call.posthog.flags()`: `$feature/<key>` and `$active_feature_flags`, so breakdowns by
-     * variant work for server events too. Flags are never evaluated just for this.
+     * A `posthog-server` client created elsewhere, used instead of one built from these options; the
+     * options that configure the official SDK (host, keys, batching…) are then ignored. Closing the
+     * [PostHogClient] flushes it but does not close it; whoever created it does. The options that
+     * shape every event the SDK sends ([beforeSend], [disableGeoip], [PersonProfiles.NEVER], super
+     * properties, opting out) need a client built here; with this one they apply to what
+     * posthog-ktor captures only.
      */
-    public var attachAccessedFlags: Boolean = config.boolean("attachAccessedFlags") ?: true
-
-    /**
-     * The exceptions never reported, with their subclasses: requests the client got wrong (bad
-     * request, not found, content it cannot send or receive, too large) and clients that went away.
-     * Add your own, or clear it.
-     */
-    public val excludedExceptions: MutableSet<KClass<out Throwable>> = defaultExcludedExceptions.toMutableSet()
+    public var sdkClient: PostHogInterface? = null
 
     internal var sdk: PostHogSdkConfig.Builder.() -> Unit = {}
-    internal var distinctIdResolver: (ApplicationCall) -> String? = { null }
-    internal var requestFilter: (ApplicationCall) -> Boolean = { true }
-    internal var extraProperties: (ApplicationCall) -> Map<String, Any?> = { emptyMap() }
-    internal var propertiesMap: (Map<String, Any>) -> Map<String, Any> = { it }
-    internal var exceptionFilter: (Throwable, ApplicationCall) -> Boolean = { _, _ -> true }
-    internal var captureStatus: (HttpStatusCode) -> Boolean = { it.value >= HttpStatusCode.InternalServerError.value }
-    internal var flagContext: PostHogEvaluateFlagsOptions.Builder.(ApplicationCall) -> Unit = {}
     internal val beforeSendHooks = mutableListOf<(PostHogEvent) -> PostHogEvent?>()
 
     /**
@@ -231,6 +189,69 @@ public class PostHogPluginConfig internal constructor(
     public fun sdk(configure: PostHogSdkConfig.Builder.() -> Unit) {
         sdk = configure
     }
+}
+
+/**
+ * Configuration of the [PostHog] plugin: the options of the client it builds ([PostHogClientConfig])
+ * and how it treats calls. Values come from the `posthog` section of the application config first;
+ * the `install(PostHog) { }` block can override them.
+ */
+public class PostHogPluginConfig internal constructor(
+    config: ApplicationConfig,
+) : PostHogClientConfig(config) {
+    /**
+     * A client made with `PostHogClient { }` before the application, to share it with work that
+     * runs outside it (a dependency injection container, a message consumer, a scheduled task in
+     * another process mode). Calls then capture with it, and `application.posthog` is it; the client
+     * options set here are ignored. The plugin does not close it: whoever made it does.
+     */
+    public var client: PostHogClient? = null
+
+    /**
+     * Calls whose `User-Agent` contains one of these (ignoring case) capture nothing, as posthog-js'
+     * `custom_blocked_useragents`: bots, uptime checks. `call.posthog` does nothing in them and their
+     * exceptions are not reported.
+     */
+    public val customBlockedUserAgents: MutableList<String> = config.list("customBlockedUserAgents").toMutableList()
+
+    /**
+     * Whether a call's distinct id and session id come from the tracing headers posthog-js sends
+     * (`X-PostHog-Distinct-Id`, `X-PostHog-Session-Id`). They link server events to the browser's
+     * person and session replay. The browser controls them: they are analytics context, never
+     * authentication or authorization.
+     */
+    public var useTracingHeaders: Boolean = config.boolean("useTracingHeaders") ?: true
+
+    /** Whether events carry the client's address as `$ip` (honouring Ktor's forwarded-headers plugins). */
+    public var captureIp: Boolean = config.boolean("captureIp") ?: true
+
+    /** Whether log lines written during a call carry [MDC_DISTINCT_ID] and [MDC_SESSION_ID] in the MDC. */
+    public var logContext: Boolean = config.boolean("logContext") ?: true
+
+    /** Whether exceptions of a call go to PostHog error tracking (see [captureStatus], [excludedExceptions]). */
+    public var captureExceptions: Boolean = config.boolean("captureExceptions") ?: true
+
+    /**
+     * Whether events captured in a call (exceptions included) carry the flags the call has read
+     * through `call.posthog.flags()`: `$feature/<key>` and `$active_feature_flags`, so breakdowns by
+     * variant work for server events too. Flags are never evaluated just for this.
+     */
+    public var attachAccessedFlags: Boolean = config.boolean("attachAccessedFlags") ?: true
+
+    /**
+     * The exceptions never reported, with their subclasses: requests the client got wrong (bad
+     * request, not found, content it cannot send or receive, too large) and clients that went away.
+     * Add your own, or clear it.
+     */
+    public val excludedExceptions: MutableSet<KClass<out Throwable>> = defaultExcludedExceptions.toMutableSet()
+
+    internal var distinctIdResolver: (ApplicationCall) -> String? = { null }
+    internal var requestFilter: (ApplicationCall) -> Boolean = { true }
+    internal var extraProperties: (ApplicationCall) -> Map<String, Any?> = { emptyMap() }
+    internal var propertiesMap: (Map<String, Any>) -> Map<String, Any> = { it }
+    internal var exceptionFilter: (Throwable, ApplicationCall) -> Boolean = { _, _ -> true }
+    internal var captureStatus: (HttpStatusCode) -> Boolean = { it.value >= HttpStatusCode.InternalServerError.value }
+    internal var flagContext: PostHogEvaluateFlagsOptions.Builder.(ApplicationCall) -> Unit = {}
 
     /**
      * The distinct id of the call's authenticated user, e.g. `{ it.principal<UserIdPrincipal>()?.name }`.
@@ -292,36 +313,36 @@ public class PostHogPluginConfig internal constructor(
                 io.ktor.util.cio.ChannelWriteException::class,
                 io.ktor.utils.io.ClosedWriteChannelException::class,
             )
-
-        fun ApplicationConfig.string(key: String) = propertyOrNull(key)?.getString()?.takeIf { it.isNotBlank() }
-
-        fun ApplicationConfig.boolean(key: String) = propertyOrNull(key)?.getString()?.toBooleanStrictOrNull()
-
-        fun ApplicationConfig.int(key: String) = propertyOrNull(key)?.getString()?.toIntOrNull()
-
-        fun ApplicationConfig.long(key: String) = propertyOrNull(key)?.getString()?.toLongOrNull()
-
-        // A list, or a comma-separated string (an environment variable).
-        fun ApplicationConfig.list(key: String): List<String> {
-            val property = propertyOrNull(key) ?: return emptyList()
-            val values =
-                try {
-                    property.getList()
-                } catch (_: Exception) {
-                    property.getString().split(',')
-                }
-            return values.flatMap { it.split(',') }.map { it.trim() }.filter { it.isNotEmpty() }
-        }
-
-        fun ApplicationConfig.personProfiles(key: String): PersonProfiles? =
-            string(key)?.let { value ->
-                PersonProfiles.entries.firstOrNull { it.name.equals(value.replace('-', '_'), ignoreCase = true) }
-                    ?: throw IllegalArgumentException(
-                        "posthog.$key is '$value'; expected one of ${PersonProfiles.entries.joinToString { it.name.lowercase() }}",
-                    )
-            }
     }
 }
+
+private fun ApplicationConfig.string(key: String) = propertyOrNull(key)?.getString()?.takeIf { it.isNotBlank() }
+
+private fun ApplicationConfig.boolean(key: String) = propertyOrNull(key)?.getString()?.toBooleanStrictOrNull()
+
+private fun ApplicationConfig.int(key: String) = propertyOrNull(key)?.getString()?.toIntOrNull()
+
+private fun ApplicationConfig.long(key: String) = propertyOrNull(key)?.getString()?.toLongOrNull()
+
+// A list, or a comma-separated string (an environment variable).
+private fun ApplicationConfig.list(key: String): List<String> {
+    val property = propertyOrNull(key) ?: return emptyList()
+    val values =
+        try {
+            property.getList()
+        } catch (_: Exception) {
+            property.getString().split(',')
+        }
+    return values.flatMap { it.split(',') }.map { it.trim() }.filter { it.isNotEmpty() }
+}
+
+private fun ApplicationConfig.personProfiles(key: String): PersonProfiles? =
+    string(key)?.let { value ->
+        PersonProfiles.entries.firstOrNull { it.name.equals(value.replace('-', '_'), ignoreCase = true) }
+            ?: throw IllegalArgumentException(
+                "posthog.$key is '$value'; expected one of ${PersonProfiles.entries.joinToString { it.name.lowercase() }}",
+            )
+    }
 
 private val clientKey = AttributeKey<PostHogClient>("PostHogClient")
 
@@ -332,7 +353,8 @@ internal val blockedKey = AttributeKey<Unit>("PostHogBlockedUserAgent")
  * The PostHog plugin for Ktor servers.
  *
  * - Owns a client of PostHog's official JVM SDK (`com.posthog:posthog-server`) for the lifetime of
- *   the application and closes it, flushing what is queued, when the application stops.
+ *   the application and closes it, flushing what is queued, when the application stops; or uses a
+ *   [PostHogClient] made before the application ([PostHogPluginConfig.client]).
  * - Gives every call a [PostHogContext]: the browser's distinct id and session id (tracing
  *   headers) or the authenticated user ([PostHogPluginConfig.resolveDistinctId]), and request
  *   properties (`$current_url`, `$request_method`, `$request_path`, `$route`, `$user_agent`, `$ip`)
@@ -354,15 +376,11 @@ internal val blockedKey = AttributeKey<Unit>("PostHogBlockedUserAgent")
 public val PostHog: ApplicationPlugin<PostHogPluginConfig> =
     createApplicationPlugin("PostHog", "posthog", ::PostHogPluginConfig) {
         val config = pluginConfig
-        val owned = config.client == null
-        val client = PostHogClient(config)
-        val sdk = config.client ?: config.buildClient(client)
-        client.sdk = sdk
-        sdk?.takeIf { config.debug }?.debug(true)
+        val shared = config.client
+        val client = shared ?: PostHogClient.create(config)
         application.attributes.put(clientKey, client)
-        if (owned && sdk != null) {
-            application.monitor.subscribe(ApplicationStopped) { sdk.closeWithin(config.shutdownTimeoutMs) }
-        }
+        // A shared client is closed by whoever made it.
+        if (shared == null) application.monitor.subscribe(ApplicationStopped) { client.close() }
 
         // The route template is known once routing has picked a route.
         application.monitor.subscribe(RoutingRoot.RoutingCallStarted) { routingCall ->
@@ -450,26 +468,13 @@ private object CallScope : Hook<suspend (ApplicationCall, suspend () -> Unit) ->
     }
 }
 
-// close() flushes and may retry against an unreachable PostHog; the application stops regardless.
-private fun PostHogInterface.closeWithin(timeoutMs: Long) {
-    val closing = Thread({ close() }, "posthog-shutdown").apply { isDaemon = true }
-    closing.start()
-    closing.join(timeoutMs.coerceAtLeast(1))
-    if (closing.isAlive) {
-        LoggerFactory
-            .getLogger(
-                PostHog::class.java,
-            ).warn("PostHog did not finish sending within {} ms; stopping without waiting", timeoutMs)
-    }
-}
-
 private fun PostHogPluginConfig.isBlockedUserAgent(call: ApplicationCall): Boolean {
     if (customBlockedUserAgents.isEmpty()) return false
     val userAgent = call.request.headers[HttpHeaders.UserAgent] ?: return false
     return customBlockedUserAgents.any { userAgent.contains(it, ignoreCase = true) }
 }
 
-private fun PostHogPluginConfig.buildClient(client: PostHogClient): PostHogInterface? {
+internal fun PostHogClientConfig.buildSdk(client: PostHogClient): PostHogInterface? {
     val token = projectToken ?: return null
     val builder = PostHogSdkConfig.builder(token).host(host)
     secretKey?.let { builder.personalApiKey(it).localEvaluation(localEvaluation) }
